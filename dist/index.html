@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIおみくじ Dashboard 🎴✨</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px) rotate(-5deg); }
+            75% { transform: translateX(10px) rotate(5deg); }
+        }
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .tab-active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .tab-inactive {
+            background: white;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- ヘッダー -->
+        <div class="text-center mb-6">
+            <h1 class="text-5xl font-bold text-white mb-2">
+                AIおみくじ 🎴
+            </h1>
+        </div>
+
+        <!-- メインカード -->
+        <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <!-- タブナビゲーション -->
+            <div class="flex flex-wrap border-b border-gray-200 bg-gray-50">
+                <button onclick="switchTab('omikuji')" id="tab-omikuji" class="tab-active flex-1 px-4 py-4 text-center font-bold transition hover:bg-purple-100 focus:outline-none">
+                    🎴 おみくじ
+                </button>
+                <button onclick="switchTab('chat')" id="tab-chat" class="tab-inactive flex-1 px-4 py-4 text-center font-bold transition hover:bg-purple-100 focus:outline-none">
+                    💬 チャット
+                </button>
+                <button onclick="switchTab('stats')" id="tab-stats" class="tab-inactive flex-1 px-4 py-4 text-center font-bold transition hover:bg-purple-100 focus:outline-none">
+                    📊 統計
+                </button>
+                <button onclick="switchTab('history')" id="tab-history" class="tab-inactive flex-1 px-4 py-4 text-center font-bold transition hover:bg-purple-100 focus:outline-none">
+                    📜 履歴
+                </button>
+                <button onclick="switchTab('settings')" id="tab-settings" class="tab-inactive flex-1 px-4 py-4 text-center font-bold transition hover:bg-purple-100 focus:outline-none">
+                    ⚙️ 設定
+                </button>
+                <button onclick="switchTab('trace')" id="tab-trace" class="tab-inactive flex-1 px-4 py-4 text-center font-bold transition hover:bg-purple-100 focus:outline-none">
+                    🔍 トレース
+                </button>
+            </div>
+
+            <!-- タブコンテンツ -->
+            <div class="p-8">
+                <!-- おみくじタブ -->
+                <div id="content-omikuji" class="tab-content">
+                    <!-- おみくじエリア -->
+                    <div class="mb-8">
+                        <div class="text-center mb-8">
+                            <button 
+                                id="drawButton"
+                                class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-6 px-12 rounded-full text-2xl shadow-lg transform transition hover:scale-105 disabled:opacity-50"
+                                onclick="drawOmikuji()"
+                            >
+                                おみくじを引く！
+                            </button>
+                        </div>
+
+                        <!-- ローディング -->
+                        <div id="loading" class="hidden text-center py-8">
+                            <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-600"></div>
+                            <p class="text-gray-600 mt-4 text-lg">AI が占い中...</p>
+                        </div>
+
+                        <!-- 結果表示 -->
+                        <div id="result" class="hidden fade-in">
+                        <div class="text-center mb-8 p-8 bg-gradient-to-r from-yellow-100 to-pink-100 rounded-2xl">
+                            <div class="text-6xl mb-4" id="fortuneEmoji">🎉</div>
+                            <h2 class="text-4xl font-bold mb-2" id="fortuneText">大吉</h2>
+                            <div class="text-3xl mb-4" id="fortuneStars">★★★★★</div>
+                        </div>
+
+                        <div class="bg-purple-50 rounded-2xl p-6 mb-6">
+                            <h3 class="text-xl font-bold text-purple-900 mb-3 flex items-center">
+                                <span class="text-2xl mr-2">💬</span>
+                                AIからのメッセージ
+                            </h3>
+                            <p class="text-gray-800 leading-relaxed whitespace-pre-wrap" id="aiMessage"></p>
+                        </div>
+
+                        <div class="grid md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-pink-50 rounded-xl p-4 text-center">
+                                <div class="text-3xl mb-2">🎨</div>
+                                <div class="text-sm text-gray-600 mb-1">ラッキーカラー</div>
+                                <div class="font-bold text-lg" id="luckyColor">赤</div>
+                            </div>
+                            <div class="bg-blue-50 rounded-xl p-4 text-center">
+                                <div class="text-3xl mb-2">✨</div>
+                                <div class="text-sm text-gray-600 mb-1">ラッキーアイテム</div>
+                                <div class="font-bold text-lg" id="luckyItem">スマホ</div>
+                            </div>
+                            <div class="bg-green-50 rounded-xl p-4 text-center">
+                                <div class="text-3xl mb-2">📍</div>
+                                <div class="text-sm text-gray-600 mb-1">ラッキースポット</div>
+                                <div class="font-bold text-lg" id="luckySpot">カフェ</div>
+                            </div>
+                        </div>
+
+                        <div class="text-center space-y-3">
+                            <button 
+                                onclick="switchTab('chat')"
+                                class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-10 rounded-full transition transform hover:scale-105 shadow-lg"
+                            >
+                                💬 AIとチャットする
+                            </button>
+                            <div>
+                                <button 
+                                    onclick="reset()"
+                                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-full transition"
+                                >
+                                    もう一回引く 🎴
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- チャットタブ（NEW！） -->
+                <div id="content-chat" class="tab-content hidden">
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 h-[calc(100vh-300px)] flex flex-col">
+                        <div class="mb-4">
+                            <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                                <span class="text-3xl mr-3">💬</span>
+                                AIとチャット
+                            </h2>
+                            <p class="text-gray-600 mt-2 text-sm">
+                                おみくじの結果について質問したり、運勢についてアドバイスをもらおう！✨
+                            </p>
+                        </div>
+
+                        <!-- チャットメッセージエリア -->
+                        <div id="chatMessages" class="bg-white rounded-xl p-4 mb-4 flex-1 overflow-y-auto space-y-3">
+                            <div class="text-center text-gray-400 text-sm py-8">
+                                メッセージを送信してAIと会話を始めましょう！✨<br>
+                                おみくじを引いた後に質問するのもおすすめ！🎴
+                            </div>
+                        </div>
+
+                        <!-- チャット入力エリア -->
+                        <div class="flex gap-2">
+                            <input 
+                                type="text" 
+                                id="chatInput" 
+                                placeholder="メッセージを入力...（例：今日の運勢どう？）" 
+                                class="flex-1 border border-gray-300 rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                onkeypress="if(event.key === 'Enter') sendMessage()"
+                            >
+                            <button 
+                                onclick="sendMessage()"
+                                class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold px-8 py-3 rounded-full transition transform hover:scale-105"
+                            >
+                                送信 📤
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 統計タブ -->
+                <div id="content-stats" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800">📊 あなたのおみくじ統計</h2>
+                    
+                    <!-- サマリーカード -->
+                    <div class="grid md:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl p-6 text-center">
+                            <div class="text-3xl mb-2">🎴</div>
+                            <div class="text-sm text-gray-600 mb-1">総引き回数</div>
+                            <div class="text-3xl font-bold text-purple-900" id="totalCount">0</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-pink-100 to-pink-200 rounded-xl p-6 text-center">
+                            <div class="text-3xl mb-2">🎉</div>
+                            <div class="text-sm text-gray-600 mb-1">大吉率</div>
+                            <div class="text-3xl font-bold text-pink-900" id="daiKichiRate">0%</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl p-6 text-center">
+                            <div class="text-3xl mb-2">🎯</div>
+                            <div class="text-sm text-gray-600 mb-1">的中率</div>
+                            <div class="text-3xl font-bold text-blue-900" id="accuracyRate">0%</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-100 to-green-200 rounded-xl p-6 text-center">
+                            <div class="text-3xl mb-2">🔥</div>
+                            <div class="text-sm text-gray-600 mb-1">連続記録</div>
+                            <div class="text-3xl font-bold text-green-900" id="streak">0日</div>
+                        </div>
+                    </div>
+
+                    <!-- グラフエリア -->
+                    <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-bold mb-4 text-gray-800">運勢分布</h3>
+                        <canvas id="fortuneChart" height="80"></canvas>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h3 class="text-lg font-bold mb-4 text-gray-800">月別推移</h3>
+                        <canvas id="monthlyChart" height="80"></canvas>
+                    </div>
+                </div>
+
+                <!-- 履歴タブ -->
+                <div id="content-history" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800">📜 おみくじ履歴</h2>
+                    
+                    <!-- フィルター -->
+                    <div class="mb-6 flex gap-4">
+                        <select id="filterFortune" class="border border-gray-300 rounded-lg px-4 py-2">
+                            <option value="">すべての運勢</option>
+                            <option value="大吉">大吉</option>
+                            <option value="中吉">中吉</option>
+                            <option value="小吉">小吉</option>
+                            <option value="吉">吉</option>
+                            <option value="末吉">末吉</option>
+                            <option value="凶">凶</option>
+                        </select>
+                        <input type="date" id="filterDate" class="border border-gray-300 rounded-lg px-4 py-2">
+                        <button onclick="filterHistory()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                            フィルター
+                        </button>
+                    </div>
+
+                    <!-- 履歴リスト -->
+                    <div id="historyList" class="space-y-4">
+                        <div class="bg-gray-50 rounded-xl p-6 text-center text-gray-500">
+                            まだおみくじを引いていません
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定タブ -->
+                <div id="content-settings" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800">⚙️ 設定</h2>
+                    
+                    <!-- ポリシー設定 -->
+                    <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-bold mb-4 text-gray-800 flex items-center">
+                            <span class="text-2xl mr-2">🛡️</span>
+                            ポリシー設定（AgentCore Policy）
+                        </h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="enableDailyLimit" class="mr-2">
+                                    <span>1日の引き回数を制限する</span>
+                                </label>
+                                <div class="ml-6 mt-2">
+                                    <input type="number" id="dailyLimit" value="3" min="1" max="100" 
+                                           class="border border-gray-300 rounded px-3 py-1 w-20">
+                                    <span class="ml-2 text-gray-600">回まで</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="enableCooldown" class="mr-2">
+                                    <span>連続引きのクールダウン</span>
+                                </label>
+                                <div class="ml-6 mt-2">
+                                    <input type="number" id="cooldownMinutes" value="30" min="1" max="1440" 
+                                           class="border border-gray-300 rounded px-3 py-1 w-20">
+                                    <span class="ml-2 text-gray-600">分間</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 通知設定 -->
+                    <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                        <h3 class="text-lg font-bold mb-4 text-gray-800">🔔 通知設定</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="notifyDailyOmikuji" class="mr-2">
+                                <span>毎日のおみくじをリマインド</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="notifyAchievement" class="mr-2">
+                                <span>実績解除時に通知</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- データ管理 -->
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h3 class="text-lg font-bold mb-4 text-gray-800">💾 データ管理</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <button onclick="exportData()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                                    📥 データをエクスポート
+                                </button>
+                            </div>
+                            <div>
+                                <button onclick="clearChat()" class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700">
+                                    💬 チャット履歴を削除
+                                </button>
+                            </div>
+                            <div>
+                                <button onclick="clearData()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">
+                                    🗑️ すべてのデータを削除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- トレースタブ -->
+                <div id="content-trace" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800">🔍 AIトレース（Observability）</h2>
+                    
+                    <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">リアルタイム思考プロセス</h3>
+                            <span id="traceStatus" class="text-sm text-gray-500">待機中...</span>
+                        </div>
+                        <div id="traceLog" class="bg-white rounded-lg p-4 font-mono text-sm space-y-2 max-h-96 overflow-y-auto">
+                            <div class="text-gray-500">おみくじを引くとAIの思考プロセスが表示されます</div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="bg-blue-50 rounded-xl p-6">
+                            <h4 class="font-bold mb-2 text-blue-900">🔗 CloudWatch Logs</h4>
+                            <p class="text-sm text-gray-700 mb-3">詳細なログを確認</p>
+                            <a href="https://console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#logsV2:log-groups/log-group/$252Faws$252Fbedrock-agentcore$252Fruntimes$252Fmy_agent-9NBXM54pmz-DEFAULT" 
+                               target="_blank"
+                               class="text-blue-600 hover:underline text-sm">
+                                CloudWatch で確認 →
+                            </a>
+                        </div>
+                        <div class="bg-purple-50 rounded-xl p-6">
+                            <h4 class="font-bold mb-2 text-purple-900">📊 GenAI Dashboard</h4>
+                            <p class="text-sm text-gray-700 mb-3">パフォーマンス監視</p>
+                            <a href="https://console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#gen-ai-observability/agent-core" 
+                               target="_blank"
+                               class="text-purple-600 hover:underline text-sm">
+                                ダッシュボードを開く →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        const AGENT_ARN = 'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
+        const AWS_REGION = 'ap-northeast-1';
+
+        // 運勢に対応する絵文字
+        const fortuneEmojis = {
+            '大吉': '🎉',
+            '中吉': '😊',
+            '小吉': '🌸',
+            '吉': '✨',
+            '末吉': '🍀',
+            '凶': '💪'
+        };
+
+        // ローカルストレージのキー
+        const STORAGE_KEY = 'omikuji_history';
+
+        // タブ切り替え
+        function switchTab(tabName) {
+            // すべてのタブボタンを非アクティブに
+            const tabs = ['omikuji', 'chat', 'stats', 'history', 'settings', 'trace'];
+            tabs.forEach(tab => {
+                document.getElementById(`tab-${tab}`).classList.remove('tab-active');
+                document.getElementById(`tab-${tab}`).classList.add('tab-inactive');
+                document.getElementById(`content-${tab}`).classList.add('hidden');
+            });
+
+            // 選択したタブをアクティブに
+            document.getElementById(`tab-${tabName}`).classList.add('tab-active');
+            document.getElementById(`tab-${tabName}`).classList.remove('tab-inactive');
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+
+            // タブごとの初期化処理
+            if (tabName === 'stats') {
+                updateStats();
+            } else if (tabName === 'history') {
+                loadHistory();
+            } else if (tabName === 'chat') {
+                // チャット入力欄にフォーカス
+                setTimeout(() => {
+                    document.getElementById('chatInput')?.focus();
+                }, 100);
+            }
+        }
+
+        // おみくじを引く
+        async function drawOmikuji() {
+            const button = document.getElementById('drawButton');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+
+            result.classList.add('hidden');
+            button.disabled = true;
+            loading.classList.remove('hidden');
+
+            // トレースログ開始
+            addTraceLog('おみくじ引き開始...');
+            addTraceLog('API呼び出し中...');
+
+            try {
+                // 本物のAPI呼び出し
+                const response = await fetch('/api/omikuji', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: 'おみくじ引きたい～！',
+                        sessionId: currentSessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('おみくじの取得に失敗しました');
+                }
+
+                const data = await response.json();
+                
+                addTraceLog(`運勢: ${data.fortune_data.fortune} を決定`);
+                addTraceLog('✅ おみくじ生成完了！');
+
+                displayResult(data);
+                saveHistory(data.fortune_data);
+                
+                // チャットにもおみくじ結果を追加
+                const fortuneData = data.fortune_data;
+                const chatMessage = `おみくじ引いたよ～！🎴✨\n\n【${fortuneData.fortune}】${fortuneData.stars}\n\nラッキーカラー: ${fortuneData.lucky_color} 🎨\nラッキーアイテム: ${fortuneData.lucky_item} ✨\nラッキースポット: ${fortuneData.lucky_spot} 📍\n\n何か聞きたいことある？😊💕`;
+                addChatMessage('assistant', chatMessage);
+
+            } catch (err) {
+                console.error('Error:', err);
+                addTraceLog('❌ エラーが発生しました');
+                alert('エラーが発生しました。もう一度お試しください。');
+            } finally {
+                loading.classList.add('hidden');
+                button.disabled = false;
+            }
+        }
+
+        function displayResult(data) {
+            const result = document.getElementById('result');
+            const fortuneData = data.fortune_data;
+            
+            document.getElementById('fortuneEmoji').textContent = fortuneEmojis[fortuneData.fortune] || '🎴';
+            document.getElementById('fortuneText').textContent = fortuneData.fortune;
+            document.getElementById('fortuneStars').textContent = fortuneData.stars;
+
+            const aiResponse = JSON.parse(data.result);
+            const message = aiResponse.content[0].text;
+            document.getElementById('aiMessage').textContent = message;
+
+            document.getElementById('luckyColor').textContent = fortuneData.lucky_color;
+            document.getElementById('luckyItem').textContent = fortuneData.lucky_item;
+            document.getElementById('luckySpot').textContent = fortuneData.lucky_spot;
+
+            result.classList.remove('hidden');
+        }
+
+        function reset() {
+            document.getElementById('result').classList.add('hidden');
+        }
+
+        // ========================================
+        // チャット機能（NEW！）
+        // ========================================
+        
+        const CHAT_STORAGE_KEY = 'omikuji_chat_history';
+        let currentSessionId = Date.now();
+        
+        // チャット初期化
+        function initChat() {
+            const savedChat = localStorage.getItem(CHAT_STORAGE_KEY);
+            if (savedChat) {
+                const chatHistory = JSON.parse(savedChat);
+                const messagesContainer = document.getElementById('chatMessages');
+                messagesContainer.innerHTML = ''; // クリア
+                
+                chatHistory.forEach((msg, index) => {
+                    const msgDate = new Date(msg.timestamp);
+                    const dateStr = msgDate.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' });
+                    const timestamp = msgDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                    
+                    // 日付区切り
+                    const prevMsg = chatHistory[index - 1];
+                    const prevDate = prevMsg ? new Date(prevMsg.timestamp).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' }) : null;
+                    
+                    if (!prevDate || prevDate !== dateStr) {
+                        const dateSeparator = document.createElement('div');
+                        dateSeparator.className = 'text-center text-xs text-gray-400 my-4';
+                        dateSeparator.innerHTML = `━━━ ${msgDate.toLocaleDateString('ja-JP')} ━━━`;
+                        messagesContainer.appendChild(dateSeparator);
+                    }
+                    
+                    // メッセージ
+                    const messageDiv = document.createElement('div');
+                    
+                    if (msg.role === 'user') {
+                        messageDiv.className = 'flex justify-end items-start gap-2';
+                        messageDiv.innerHTML = `
+                            <span class="text-xs text-gray-400 mt-1">${timestamp}</span>
+                            <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl rounded-tr-none px-4 py-3 max-w-[70%]">
+                                <p class="text-sm whitespace-pre-wrap">${escapeHtml(msg.content)}</p>
+                            </div>
+                        `;
+                    } else {
+                        messageDiv.className = 'flex justify-start items-start gap-2';
+                        messageDiv.innerHTML = `
+                            <div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none px-4 py-3 max-w-[70%]">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-sm font-bold text-purple-600">AI占い師</span>
+                                    <span class="text-xs text-gray-500">Memory ON</span>
+                                </div>
+                                <p class="text-sm whitespace-pre-wrap">${escapeHtml(msg.content)}</p>
+                            </div>
+                            <span class="text-xs text-gray-400 mt-1">${timestamp}</span>
+                        `;
+                    }
+                    
+                    messagesContainer.appendChild(messageDiv);
+                });
+                
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        // メッセージ送信
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // ユーザーメッセージ表示
+            addChatMessage('user', message);
+            input.value = '';
+            
+            // トレースログ
+            addTraceLog(`チャット送信: "${message}"`);
+            
+            // ローディング表示
+            const loadingId = addChatMessage('assistant', '考え中...', true);
+            
+            try {
+                // 本物のAPI呼び出し
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        sessionId: currentSessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('チャットの送信に失敗しました');
+                }
+
+                const data = await response.json();
+                const aiResponse = JSON.parse(data.response);
+                const aiMessage = aiResponse.content[0].text;
+                
+                // ローディング削除
+                document.getElementById(loadingId).remove();
+                
+                // AI応答表示
+                addChatMessage('assistant', aiMessage);
+                
+                addTraceLog(`AI応答完了`);
+                
+            } catch (err) {
+                console.error('Chat error:', err);
+                document.getElementById(loadingId).remove();
+                addChatMessage('assistant', 'ごめん！エラーが出ちゃった💦 もう一回試してみて！');
+                addTraceLog('❌ チャットエラー');
+            }
+        }
+
+        // チャットメッセージ追加
+        function addChatMessage(role, content, isLoading = false) {
+            const messagesContainer = document.getElementById('chatMessages');
+            
+            // 初回メッセージなら案内を削除
+            if (messagesContainer.children[0]?.textContent.includes('おみくじを引くか')) {
+                messagesContainer.innerHTML = '';
+            }
+            
+            const now = new Date();
+            const timestamp = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = now.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' });
+            
+            // 日付区切りを追加（前回のメッセージと日付が違う場合）
+            const lastMessage = messagesContainer.lastElementChild;
+            const lastDate = lastMessage?.dataset?.date;
+            if (!lastDate || lastDate !== dateStr) {
+                const dateSeparator = document.createElement('div');
+                dateSeparator.className = 'text-center text-xs text-gray-400 my-4';
+                dateSeparator.dataset.date = dateStr;
+                dateSeparator.innerHTML = `━━━ ${now.toLocaleDateString('ja-JP')} ━━━`;
+                messagesContainer.appendChild(dateSeparator);
+            }
+            
+            const messageDiv = document.createElement('div');
+            const messageId = `msg-${Date.now()}-${Math.random()}`;
+            messageDiv.id = messageId;
+            messageDiv.dataset.date = dateStr;
+            
+            if (role === 'user') {
+                messageDiv.className = 'flex justify-end items-start gap-2';
+                messageDiv.innerHTML = `
+                    <span class="text-xs text-gray-400 mt-1">${timestamp}</span>
+                    <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl rounded-tr-none px-4 py-3 max-w-[70%]">
+                        <p class="text-sm whitespace-pre-wrap">${escapeHtml(content)}</p>
+                    </div>
+                `;
+                
+                // 履歴保存
+                saveChatMessage(role, content);
+                
+            } else {
+                messageDiv.className = 'flex justify-start items-start gap-2';
+                const loadingClass = isLoading ? 'animate-pulse' : '';
+                messageDiv.innerHTML = `
+                    <div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none px-4 py-3 max-w-[70%] ${loadingClass}">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-sm font-bold text-purple-600">AI占い師</span>
+                            <span class="text-xs text-gray-500">Memory ON</span>
+                        </div>
+                        <p class="text-sm whitespace-pre-wrap">${escapeHtml(content)}</p>
+                    </div>
+                    <span class="text-xs text-gray-400 mt-1">${timestamp}</span>
+                `;
+                
+                if (!isLoading) {
+                    saveChatMessage(role, content);
+                }
+            }
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            return messageId;
+        }
+
+        // チャット履歴保存
+        function saveChatMessage(role, content) {
+            let chatHistory = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
+            chatHistory.push({
+                role,
+                content,
+                timestamp: new Date().toISOString(),
+                sessionId: currentSessionId
+            });
+            
+            // 最新100件のみ保持
+            if (chatHistory.length > 100) {
+                chatHistory = chatHistory.slice(-100);
+            }
+            
+            localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatHistory));
+        }
+
+        // AI応答生成（デモモード）
+        function generateAIResponse(userMessage) {
+            const msg = userMessage.toLowerCase();
+            
+            // おみくじ結果取得
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const lastFortune = history[0];
+            
+            // コンテキスト認識
+            if (msg.includes('おみくじ') || msg.includes('運勢')) {
+                if (lastFortune) {
+                    return `さっき引いたおみくじは【${lastFortune.fortune}】だったね！✨\n${lastFortune.stars}\n\nラッキーカラーは${lastFortune.lucky_color}、ラッキーアイテムは${lastFortune.lucky_item}だよ～💕\n\n${lastFortune.lucky_spot}に行くといいことあるかも！😊`;
+                } else {
+                    return 'まだおみくじ引いてないよ～！🎴\n上のボタン押しておみくじ引いてみて！✨';
+                }
+            }
+            
+            if (msg.includes('ラッキー') || msg.includes('らっきー')) {
+                if (lastFortune) {
+                    return `今日のラッキーアイテムは【${lastFortune.lucky_item}】だよ～！✨\n\nあと${lastFortune.lucky_color}のもの身につけるといいよ！💕\n\n${lastFortune.lucky_spot}に行ってみるのもおすすめ～😊`;
+                }
+            }
+            
+            if (msg.includes('統計') || msg.includes('データ')) {
+                const daiKichiCount = history.filter(h => h.fortune === '大吉').length;
+                const daiKichiRate = history.length > 0 ? ((daiKichiCount / history.length) * 100).toFixed(1) : 0;
+                return `今までのデータ見てみるね！📊\n\n総引き回数: ${history.length}回\n大吉率: ${daiKichiRate}%\n\nすごいじゃん！✨\n「統計」タブでグラフも見れるよ～📈`;
+            }
+            
+            if (msg.includes('アドバイス') || msg.includes('どうすれば')) {
+                return '今日のアドバイスね！💡\n\n1. ポジティブに考える ✨\n2. ラッキーアイテム持つ 🎁\n3. 笑顔を忘れない 😊\n4. 新しいことに挑戦 🚀\n\n運気は自分で作るものだよ～💪💕';
+            }
+            
+            if (msg.includes('ありがと') || msg.includes('thank')) {
+                return 'どういたしまして～！😊💕\n\nまた何か聞きたいことあったら言ってね！\n毎日おみくじ引いて運気チェックしよ～🎴✨';
+            }
+            
+            // デフォルト応答
+            const responses = [
+                'それめっちゃ面白いね！😊✨\n他に気になることある？',
+                'なるほどね～！💡\nおみくじの結果とか統計も見てみる？',
+                'そうなんだ～！✨\n今日の運勢とか気になる？🎴',
+                'いいね！😊💕\n何か他にも手伝えることあったら言ってね！',
+                'わかった！✨\nおみくじ引いてみたり、統計見てみたりしてね～📊'
+            ];
+            
+            return responses[Math.floor(Math.random() * responses.length)];
+        }
+
+        // チャットクリア
+        function clearChat() {
+            if (confirm('⚠️ チャット履歴を削除しますか？\n\n削除すると元に戻せません。\n（注：LocalStorageのみクリア。AgentCoreのMemoryには影響しません）')) {
+                localStorage.removeItem(CHAT_STORAGE_KEY);
+                document.getElementById('chatMessages').innerHTML = `
+                    <div class="text-center text-gray-400 text-sm py-8">
+                        メッセージを送信してAIと会話を始めましょう！✨<br>
+                        おみくじを引いた後に質問するのもおすすめ！🎴
+                    </div>
+                `;
+                addTraceLog('チャット履歴をクリアしました（LocalStorageのみ）');
+                alert('✅ チャット履歴を削除しました');
+            }
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ページ読み込み時にチャット初期化
+        window.addEventListener('load', () => {
+            initChat();
+        });
+
+        // トレースログ追加
+        function addTraceLog(message) {
+            const traceLog = document.getElementById('traceLog');
+            const timestamp = new Date().toLocaleTimeString('ja-JP');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'text-gray-700';
+            logEntry.innerHTML = `<span class="text-gray-400">[${timestamp}]</span> ${message}`;
+            
+            if (traceLog.children[0]?.textContent.includes('おみくじを引くと')) {
+                traceLog.innerHTML = '';
+            }
+            
+            traceLog.appendChild(logEntry);
+            traceLog.scrollTop = traceLog.scrollHeight;
+            
+            document.getElementById('traceStatus').textContent = '実行中...';
+            setTimeout(() => {
+                document.getElementById('traceStatus').textContent = '待機中...';
+            }, 3000);
+        }
+
+        // 履歴を保存
+        function saveHistory(fortuneData) {
+            let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            history.unshift({
+                ...fortuneData,
+                id: Date.now()
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+        }
+
+        // 履歴を読み込み
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const historyList = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="bg-gray-50 rounded-xl p-6 text-center text-gray-500">まだおみくじを引いていません</div>';
+                return;
+            }
+
+            historyList.innerHTML = history.map(item => `
+                <div class="bg-gray-50 rounded-xl p-6 hover:bg-gray-100 transition">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="text-4xl">${fortuneEmojis[item.fortune]}</div>
+                            <div>
+                                <div class="font-bold text-xl text-gray-800">${item.fortune}</div>
+                                <div class="text-gray-600">${item.stars}</div>
+                            </div>
+                        </div>
+                        <div class="text-right text-sm text-gray-600">
+                            <div>${new Date(item.timestamp).toLocaleDateString('ja-JP')}</div>
+                            <div>${new Date(item.timestamp).toLocaleTimeString('ja-JP')}</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex gap-2 text-sm">
+                        <span class="bg-pink-100 text-pink-800 px-3 py-1 rounded-full">🎨 ${item.lucky_color}</span>
+                        <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">✨ ${item.lucky_item}</span>
+                        <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full">📍 ${item.lucky_spot}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 統計を更新
+        function updateStats() {
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            
+            // 総回数
+            document.getElementById('totalCount').textContent = history.length;
+
+            // 大吉率
+            const daiKichiCount = history.filter(h => h.fortune === '大吉').length;
+            const daiKichiRate = history.length > 0 ? ((daiKichiCount / history.length) * 100).toFixed(1) : 0;
+            document.getElementById('daiKichiRate').textContent = `${daiKichiRate}%`;
+
+            // 的中率（デモ用ランダム）
+            const accuracyRate = history.length > 0 ? (70 + Math.random() * 20).toFixed(1) : 0;
+            document.getElementById('accuracyRate').textContent = `${accuracyRate}%`;
+
+            // 連続記録
+            document.getElementById('streak').textContent = `${history.length}日`;
+
+            // グラフ描画
+            drawFortuneChart(history);
+            drawMonthlyChart(history);
+        }
+
+        // 運勢分布グラフ
+        function drawFortuneChart(history) {
+            const ctx = document.getElementById('fortuneChart');
+            if (window.fortuneChartInstance) {
+                window.fortuneChartInstance.destroy();
+            }
+
+            const fortuneCounts = {
+                '大吉': 0, '中吉': 0, '小吉': 0, '吉': 0, '末吉': 0, '凶': 0
+            };
+            history.forEach(h => {
+                if (fortuneCounts[h.fortune] !== undefined) {
+                    fortuneCounts[h.fortune]++;
+                }
+            });
+
+            window.fortuneChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(fortuneCounts),
+                    datasets: [{
+                        label: '回数',
+                        data: Object.values(fortuneCounts),
+                        backgroundColor: [
+                            '#fbbf24', '#f59e0b', '#fb923c', '#a78bfa', '#c084fc', '#e879f9'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true
+                }
+            });
+        }
+
+        // 月別推移グラフ
+        function drawMonthlyChart(history) {
+            const ctx = document.getElementById('monthlyChart');
+            if (window.monthlyChartInstance) {
+                window.monthlyChartInstance.destroy();
+            }
+
+            const monthlyData = {};
+            history.forEach(h => {
+                const month = new Date(h.timestamp).toLocaleDateString('ja-JP', { month: 'short' });
+                monthlyData[month] = (monthlyData[month] || 0) + 1;
+            });
+
+            window.monthlyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(monthlyData),
+                    datasets: [{
+                        label: 'おみくじ回数',
+                        data: Object.values(monthlyData),
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true
+                }
+            });
+        }
+
+        // ユーティリティ関数
+        function getStars(fortune) {
+            const starMap = {
+                '大吉': '★★★★★',
+                '中吉': '★★★★☆',
+                '小吉': '★★★☆☆',
+                '吉': '★★★☆☆',
+                '末吉': '★★☆☆☆',
+                '凶': '★☆☆☆☆'
+            };
+            return starMap[fortune] || '★★★☆☆';
+        }
+
+        function getFortunedComment(fortune) {
+            const comments = {
+                '大吉': '超ラッキー！今日は最高だよ～！😍💕',
+                '中吉': 'いい感じじゃん！😊✨',
+                '小吉': 'まあまあいい感じだね～🌸',
+                '吉': '普通にいい日だよ！✨',
+                '末吉': 'ちょっと地味だけどOK！🍀',
+                '凶': '今日は無理しないでね～💪'
+            };
+            return comments[fortune] || '';
+        }
+
+        function getRandomItem(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function filterHistory() {
+            // フィルター機能の実装（TODO）
+            alert('フィルター機能は開発中です！');
+        }
+
+        function exportData() {
+            const history = localStorage.getItem(STORAGE_KEY);
+            const blob = new Blob([history], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `omikuji_data_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        function clearData() {
+            if (confirm('本当にすべてのデータを削除しますか？')) {
+                localStorage.removeItem(STORAGE_KEY);
+                alert('データを削除しました');
+                loadHistory();
+                updateStats();
+            }
+        }
+    </script>
+</body>
+</html>
