@@ -71,9 +71,11 @@ export const handler: Handler<InvokeAgentRequest, InvokeAgentResponse> = async (
         }
 
         // トレースイベント
-        if (event.trace) {
-          traceId = event.trace.traceId || '';
-          console.log('[InvokeAgent] Trace:', traceId);
+        if (event.trace && event.trace.trace) {
+          // trace オブジェクトから情報を取得
+          const trace = event.trace.trace;
+          traceId = JSON.stringify(trace).substring(0, 100);
+          console.log('[InvokeAgent] Trace received');
         }
       }
     }
