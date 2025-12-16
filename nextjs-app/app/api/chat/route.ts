@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runWithAmplifyServerContext } from '@/lib/amplify-server';
-import { Lambda } from '@aws-sdk/client-lambda';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 
 /**
  * チャット API Route
  * Amplify の Lambda Function (invoke-agent) を呼び出す
  */
 
-const lambda = new Lambda({
+const lambda = new LambdaClient({
   region: process.env.AWS_REGION || 'ap-northeast-1',
 });
 
@@ -25,33 +24,28 @@ export async function POST(request: NextRequest) {
 
     console.log('[Chat API] Request:', { message, sessionId });
 
-    // Amplify の Lambda Function を呼び出し
-    const result = await runWithAmplifyServerContext({
-      nextServerContext: { request },
-      operation: async (contextSpec) => {
-        const functionName =
-          process.env.INVOKE_AGENT_FUNCTION_NAME || 'invoke-agent';
+    // Lambda Function を直接呼び出し
+    const functionName =
+      process.env.INVOKE_AGENT_FUNCTION_NAME || 'invoke-agent';
 
-        const response = await lambda.invoke({
-          FunctionName: functionName,
-          Payload: JSON.stringify({
-            prompt: message,
-            sessionId: sessionId || `chat-${Date.now()}`,
-          }),
-        });
-
-        if (response.Payload) {
-          const payload = JSON.parse(
-            new TextDecoder().decode(response.Payload)
-          );
-          return payload;
-        }
-
-        throw new Error('No payload returned from Lambda');
-      },
+    const command = new InvokeCommand({
+      FunctionName: functionName,
+      Payload: JSON.stringify({
+        prompt: message,
+        sessionId: sessionId || `chat-${Date.now()}`,
+      }),
     });
 
-    return NextResponse.json(result);
+    const response = await lambda.send(command);
+
+    if (response.Payload) {
+      const payload = JSON.parse(
+        new TextDecoder().decode(response.Payload)
+      );
+      return NextResponse.json(payload);
+    }
+
+    throw new Error('No payload returned from Lambda');
   } catch (error) {
     console.error('[Chat API] Error:', error);
     return NextResponse.json(
