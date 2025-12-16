@@ -61,6 +61,7 @@ const schema = a.schema({
 
   /**
    * おみくじを引く - AgentCore Runtime を直接呼び出し
+   * Note: カスタムハンドラーはIAM認証のみサポート
    */
   drawOmikuji: a
     .query()
@@ -70,8 +71,7 @@ const schema = a.schema({
     })
     .returns(a.ref('OmikujiResponse'))
     .authorization((allow) => [
-      allow.guest(),
-      allow.authenticated(),
+      allow.publicApiKey(),
     ])
     .handler(
       a.handler.custom({
@@ -82,6 +82,7 @@ const schema = a.schema({
 
   /**
    * AIとチャット - AgentCore Runtime を直接呼び出し
+   * Note: カスタムハンドラーはIAM認証のみサポート
    */
   chat: a
     .query()
@@ -91,8 +92,7 @@ const schema = a.schema({
     })
     .returns(a.ref('ChatResponse'))
     .authorization((allow) => [
-      allow.guest(),
-      allow.authenticated(),
+      allow.publicApiKey(),
     ])
     .handler(
       a.handler.custom({
@@ -107,6 +107,9 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: 'iam',
+    defaultAuthorizationMode: 'apiKey',
+    apiKeyAuthorizationMode: {
+      expiresInDays: 365,
+    },
   },
 });
