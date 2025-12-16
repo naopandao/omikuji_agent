@@ -61,12 +61,12 @@ const schema = a.schema({
 
   /**
    * おみくじを引く - AgentCore Runtime を直接呼び出し
-   * Note: カスタムハンドラーはIAM認証のみサポート
+   * Note: カスタムハンドラーはAPI Key認証を使用
    */
   drawOmikuji: a
     .query()
     .arguments({
-      prompt: a.string().default('おみくじを引きたい'),
+      prompt: a.string(),
       sessionId: a.string(),
     })
     .returns(a.ref('OmikujiResponse'))
