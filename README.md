@@ -35,8 +35,8 @@ Amplify Gen2 の **HTTP Data Source** を使って、AppSync から AgentCore Ru
 │  │                         │   Runtime                  │                  │ │
 │  │                         │   ┌──────────────────────┐ │                  │ │
 │  │                         │   │  omikuji_agent.py    │ │                  │ │
-│  │                         │   │  (Direct Deploy)     │ │                  │ │
-│  │                         │   │  Python 3.10-3.13    │ │                  │ │
+│  │                         │   │  AIエージェント        │ │                  │ │
+│  │                         │   │  Python 3.12         │ │                  │ │
 │  │                         │   └──────────────────────┘ │                  │ │
 │  │                         │              │             │                  │ │
 │  │                         │   ┌──────────┴───────────┐ │                  │ │
@@ -283,23 +283,12 @@ export default function OmikujiPage() {
 }
 ```
 
-## AgentCore Runtime デプロイ方式の比較
-
-| 項目 | Direct Code Deploy（推奨） | Container Deploy |
-|------|---------------------------|------------------|
-| Docker 必要 | ❌ 不要 | ✅ 必要 |
-| デプロイ時間 | 🚀 約10秒（更新時） | ⏱️ 約30秒 |
-| パッケージサイズ | 250MB まで | 2GB まで |
-| 対応言語 | Python 3.10-3.13 | 多言語対応 |
-| セッション作成 | 25 sessions/秒 | 0.16 sessions/秒 |
-| 管理コスト | 💰 低い | 💰 中程度 |
-
 ## 技術スタック
 
 ### バックエンド
 | 技術 | 用途 | バージョン |
 |------|------|-----------|
-| AWS Bedrock AgentCore Runtime | AIエージェント基盤 | Direct Code Deploy |
+| AWS Bedrock AgentCore Runtime | AIエージェント基盤 | Runtime |
 | AWS AppSync | GraphQL API | Amplify Gen2 |
 | Strands Agents SDK | エージェントフレームワーク | Latest |
 | AWS Bedrock Claude | メッセージ生成 | Sonnet 4 / Haiku 3 |
@@ -326,7 +315,6 @@ export default function OmikujiPage() {
 omikuji-agent/
 ├── README.md                          # このファイル
 ├── requirements.txt                   # Python依存関係
-├── pyproject.toml                     # uv プロジェクト設定
 │
 ├── omikuji_agent.py                   # AgentCore メインエージェント
 ├── my_agent.py                        # AgentCore 基礎版エージェント
@@ -355,30 +343,15 @@ omikuji-agent/
 - AWS アカウント
 - AWS CLI v2 設定済み
 - Node.js 18+
-- Python 3.10〜3.13
-- **uv** パッケージマネージャー（推奨）
+- Python 3.12+
 
-### 1. AgentCore エージェントのデプロイ
+### 1. AgentCore エージェントの準備
 
-```bash
-# プロジェクト初期化
-uv init omikuji-agent --python 3.13
-cd omikuji-agent
+AWS Console で AgentCore Runtime エージェントを作成し、ARN を取得します。
 
-# 依存関係インストール
-uv add bedrock-agentcore strands-agents strands-agents-tools
-uv add --dev bedrock-agentcore-starter-toolkit
-
-# ローカルテスト
-source .venv/bin/activate
-uv run omikuji_agent.py
-
-# AgentCore Runtime へデプロイ
-agentcore configure --entrypoint omikuji_agent.py --name omikuji-agent
-# → "Code Zip" を選択
-
-# テスト
-agentcore invoke '{"prompt":"おみくじ引きたい～！"}'
+```
+# エージェント ARN 例
+arn:aws:bedrock-agentcore:ap-northeast-1:123456789012:runtime/my_agent-xxx
 ```
 
 ### 2. Amplify Gen2 アプリのセットアップ
@@ -394,7 +367,11 @@ npx ampx sandbox
 npm run dev
 ```
 
-### 3. 本番デプロイ
+### 3. AgentCore 連携設定
+
+`amplify/backend.ts` で AgentCore Runtime ARN を設定します（上記「Amplify Gen2 + AgentCore 連携の実装」参照）。
+
+### 4. 本番デプロイ
 
 ```bash
 # Git にプッシュ → Amplify Hosting が自動デプロイ
@@ -496,7 +473,6 @@ Claude Sonnet 4 または Claude 3 Haiku のアクセスを有効化
 
 ## ロードマップ
 
-- [x] AgentCore Direct Code Deployment 対応
 - [x] Amplify Gen2 + AgentCore 直接連携
 - [ ] WebSocket によるストリーミング対応
 - [ ] Agent-to-Agent Protocol 連携
