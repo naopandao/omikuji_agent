@@ -145,26 +145,48 @@ Body:
 
 ### ✅ 完了
 
-- [x] フロントエンド（Next.js静的サイト）をAmplify Hostingにデプロイ
-- [x] モックデータでおみくじ機能動作確認
+- [x] フロントエンド（Next.js SSR）をAmplify Hostingにデプロイ
+- [x] API Route でAgentCore Runtime呼び出し実装
 - [x] UIデザイン完成
+- [x] AgentCore Runtime デプロイ済み（my_agent-9NBXM54pmz）
+- [x] ローカルでのAgentCore Runtime呼び出しテスト成功
 
-### 🚧 TODO: AgentCore Runtime デプロイ
+### 🚧 残りのセットアップ: IAMロール権限追加
 
-1. **omikuji_agent.py を AgentCore Runtime にデプロイ**
-   ```bash
-   # Starter Toolkit でデプロイ
-   agentcore configure --entrypoint omikuji_agent.py --name omikuji-agent
-   ```
+Amplify HostingのSSRアプリからAgentCore Runtimeを呼び出すには、IAMロールに権限を追加する必要があります。
 
-2. **デプロイ後、Runtime ARN を取得**
-   ```
-   arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/omikuji-agent-xxxxx
-   ```
+**AmplifyServiceRole に以下の権限を追加してください：**
 
-3. **フロントエンドから直接呼び出し**
-   - API Gateway経由、または
-   - Cognito認証 + AWS SDK でブラウザから直接呼び出し
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:InvokeAgentRuntime"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/*"
+    }
+  ]
+}
+```
+
+**手順：**
+1. AWS IAM コンソールで `AmplifyServiceRole` を検索
+2. 「許可を追加」→「インラインポリシーを作成」
+3. 上記JSONをポリシーエディタに貼り付け
+4. ポリシー名: `AmplifyAgentCoreAccess`
+5. 「ポリシーの作成」をクリック
+
+権限追加後、サイトをリロードするとAgentCore Runtimeが呼び出されます。
+※ 権限がない場合はフォールバックのモックデータが表示されます。
+
+### AgentCore Runtime 情報
+
+- **Runtime ARN**: `arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz`
+- **エンドポイント**: DEFAULT (READY)
+- **ステータス**: READY
 
 ## 技術スタック
 
