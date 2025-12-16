@@ -15,8 +15,10 @@ applications:
         build:
           commands:
             - npm run build
+            - cp -r public .next/standalone/public || true
+            - cp -r .next/static .next/standalone/.next/static || true
       artifacts:
-        baseDirectory: .next
+        baseDirectory: .next/standalone
         files:
           - '**/*'
       cache:
