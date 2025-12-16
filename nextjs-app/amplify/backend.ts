@@ -1,8 +1,8 @@
 import { defineBackend } from '@aws-amplify/backend';
-import { auth } from './auth/resource';
-import { data } from './data/resource';
-import { invokeAgentFunction } from './functions/invoke-agent/resource';
-import { omikujiFunction } from './functions/omikuji/resource';
+import { auth } from './auth/resource.js';
+import { data } from './data/resource.js';
+import { invokeAgentFunction } from './functions/invoke-agent/resource.js';
+import { omikujiFunction } from './functions/omikuji/resource.js';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 
 /**

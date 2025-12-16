@@ -34,3 +34,10 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# AWS CLI
+aws/
+awscliv2.zip
+
+# Wrangler temp files
+.wrangler/tmp/
