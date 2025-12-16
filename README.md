@@ -1,6 +1,6 @@
 # AI おみくじエージェント 🎴✨
 
-AWS Bedrock AgentCore を使ったAI占いアプリケーション
+AWS Bedrock AgentCore Runtime を使ったAI占いアプリケーション
 
 ## 概要
 
@@ -8,9 +8,9 @@ AWS Bedrock AgentCore を使ったAI占いアプリケーション
 
 ## アーキテクチャ
 
-### 推奨構成: Amplify Gen2 + AgentCore 直接連携（Lambda不要）
+### 推奨構成: AgentCore Runtime 直接連携（Lambda不要）
 
-Amplify Gen2 の **HTTP Data Source** を使って、AppSync から AgentCore Runtime の `InvokeAgentRuntime` API を直接呼び出せます。Lambda 不要でシンプルかつ高速な構成が可能です。
+**AgentCore Runtime** にエージェントをデプロイすると、`InvokeAgentRuntime` API で直接HTTPリクエストを受け付けるエンドポイントが作成されます。**Lambda不要**でシンプルかつ高速な構成が可能です。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -18,49 +18,41 @@ Amplify Gen2 の **HTTP Data Source** を使って、AppSync から AgentCore Ru
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                          ap-northeast-1                                 │ │
 │  │                                                                         │ │
-│  │  ┌─────────────────────────────────────────────────────────────────┐   │ │
-│  │  │                    Amplify Gen2                                  │   │ │
-│  │  │  ┌─────────────┐    ┌─────────────┐    ┌──────────────────────┐ │   │ │
-│  │  │  │  Next.js    │    │  AppSync    │    │  HTTP Data Source    │ │   │ │
-│  │  │  │  Frontend   │───▶│  GraphQL    │───▶│  (AgentCore Runtime) │ │   │ │
-│  │  │  │             │    │  API        │    │                      │ │   │ │
-│  │  │  └─────────────┘    └─────────────┘    └──────────┬───────────┘ │   │ │
-│  │  │                                                    │             │   │ │
-│  │  │                                    ┌───────────────┘             │   │ │
-│  │  │                                    │ InvokeAgentRuntime          │   │ │
-│  │  └────────────────────────────────────┼─────────────────────────────┘   │ │
-│  │                                       ▼                                 │ │
-│  │                         ┌────────────────────────────┐                  │ │
-│  │                         │   Bedrock AgentCore        │                  │ │
-│  │                         │   Runtime                  │                  │ │
-│  │                         │   ┌──────────────────────┐ │                  │ │
-│  │                         │   │  omikuji_agent.py    │ │                  │ │
-│  │                         │   │  AIエージェント        │ │                  │ │
-│  │                         │   │  Python 3.12         │ │                  │ │
-│  │                         │   └──────────────────────┘ │                  │ │
-│  │                         │              │             │                  │ │
-│  │                         │   ┌──────────┴───────────┐ │                  │ │
-│  │                         │   │                      │ │                  │ │
-│  │                         │   ▼                      ▼ │                  │ │
-│  │                         │ ┌────────────┐ ┌─────────┐│                  │ │
-│  │                         │ │  Memory    │ │  Code   ││                  │ │
-│  │                         │ │ (会話履歴) │ │Interpret││                  │ │
-│  │                         │ └────────────┘ └─────────┘│                  │ │
-│  │                         │              │             │                  │ │
-│  │                         │              ▼             │                  │ │
-│  │                         │   ┌──────────────────────┐ │                  │ │
-│  │                         │   │   Bedrock Claude     │ │                  │ │
-│  │                         │   │   (Sonnet 4 / Haiku) │ │                  │ │
-│  │                         │   └──────────────────────┘ │                  │ │
-│  │                         └────────────────────────────┘                  │ │
-│  │                                                                         │ │
-│  │  ┌─────────────────┐                         ┌─────────────────────┐   │ │
-│  │  │  CloudWatch     │                         │  CloudWatch GenAI   │   │ │
-│  │  │  Logs           │                         │  Dashboard          │   │ │
-│  │  └─────────────────┘                         └─────────────────────┘   │ │
-│  │                                                                         │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────────┘
+│  │  ┌─────────────────┐                                                   │ │
+│  │  │  Amplify        │                                                   │ │
+│  │  │  Hosting        │                                                   │ │
+│  │  │  ┌───────────┐  │         ┌────────────────────────────────────┐   │ │
+│  │  │  │ Next.js   │  │  HTTP   │  Bedrock AgentCore Runtime         │   │ │
+│  │  │  │ Frontend  │──┼────────▶│  ┌──────────────────────────────┐  │   │ │
+│  │  │  │ (静的)    │  │         │  │  omikuji_agent.py            │  │   │ │
+│  │  │  └───────────┘  │         │  │  (Python 3.10-3.13)          │  │   │ │
+│  │  └─────────────────┘         │  │                              │  │   │ │
+│  │                              │  │  InvokeAgentRuntime API      │  │   │ │
+│  │                              │  │  POST /runtimes/{arn}/invocations   │ │
+│  │                              │  └──────────────────────────────┘  │   │ │
+│  │                              │              │                     │   │ │
+│  │                              │   ┌──────────┴───────────┐         │   │ │
+│  │                              │   │                      │         │   │ │
+│  │                              │   ▼                      ▼         │   │ │
+│  │                              │ ┌────────────┐ ┌─────────────────┐ │   │ │
+│  │                              │ │  Memory    │ │  Code           │ │   │ │
+│  │                              │ │ (会話履歴) │ │  Interpreter    │ │   │ │
+│  │                              │ └────────────┘ └─────────────────┘ │   │ │
+│  │                              │              │                     │   │ │
+│  │                              │              ▼                     │   │ │
+│  │                              │   ┌──────────────────────┐         │   │ │
+│  │                              │   │   Bedrock Claude     │         │   │ │
+│  │                              │   │   (Sonnet 4 / Haiku) │         │   │ │
+│  │                              │   └──────────────────────┘         │   │ │
+│  │                              └────────────────────────────────────┘   │ │
+│  │                                                                       │ │
+│  │  ┌─────────────────┐                         ┌─────────────────────┐ │ │
+│  │  │  CloudWatch     │                         │  CloudWatch GenAI   │ │ │
+│  │  │  Logs           │                         │  Dashboard          │ │ │
+│  │  └─────────────────┘                         └─────────────────────┘ │ │
+│  │                                                                       │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
 
         ┌────────────┐
         │   Client   │
@@ -72,269 +64,147 @@ Amplify Gen2 の **HTTP Data Source** を使って、AppSync から AgentCore Ru
 
 ### 構成の比較
 
-| 構成 | Lambda | API Gateway | 複雑さ | レスポンス速度 |
-|------|--------|-------------|--------|----------------|
-| **Amplify Gen2 + AgentCore（推奨）** | ❌ 不要 | ❌ 不要 | 🟢 シンプル | 🚀 高速 |
-| API Gateway + AgentCore | ❌ 不要 | ✅ 必要 | 🟡 中程度 | 🚀 高速 |
-| Lambda 経由（従来） | ✅ 必要 | ✅ 必要 | 🔴 複雑 | ⏱️ 遅い |
+| 構成 | Lambda | 複雑さ | レスポンス速度 | 備考 |
+|------|--------|--------|----------------|------|
+| **AgentCore Runtime 直接（推奨）** | ❌ 不要 | 🟢 シンプル | 🚀 高速 | エージェントをRuntimeにデプロイ |
+| API Gateway + AgentCore | ❌ 不要 | 🟡 中程度 | 🚀 高速 | AWS Service Integration |
+| Lambda 経由（従来） | ✅ 必要 | 🔴 複雑 | ⏱️ 遅い | コールドスタートあり |
 
-## Amplify Gen2 + AgentCore 連携の実装
+## AgentCore Runtime とは
 
-### 1. backend.ts - HTTP Data Source の設定
+**Amazon Bedrock AgentCore Runtime** は、AIエージェントをデプロイ・実行するためのフルマネージドサーバーレス環境です。
 
-```typescript
-// amplify/backend.ts
-import { defineBackend } from '@aws-amplify/backend';
-import { auth } from './auth/resource';
-import { data } from './data/resource';
-import { Policy, PolicyStatement } from 'aws-cdk-lib/aws-iam';
+### 主な特徴
 
-const backend = defineBackend({
-  auth,
-  data,
-});
+- **サーバーレス**: インフラ管理不要
+- **低レイテンシ**: コールドスタートなし
+- **直接HTTP呼び出し**: `InvokeAgentRuntime` APIでエンドポイントを直接叩ける
+- **セッション分離**: ユーザーごとにセッションを分離
+- **マルチフレームワーク対応**: Strands, LangChain, LangGraph, CrewAI など
 
-// AgentCore Runtime を HTTP Data Source として追加
-const AGENTCORE_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
-const AGENTCORE_ENDPOINT = `https://bedrock-agentcore.ap-northeast-1.amazonaws.com/runtimes/${AGENTCORE_RUNTIME_ARN}/invocations`;
+### デプロイ方法
 
-const dataStack = backend.data.stack;
-const dataResources = backend.data.resources;
+AgentCore Runtime には2つのデプロイ方法があります：
 
-// AgentCore HTTP Data Source
-dataResources.cfnResources.cfnGraphqlApi.addPropertyOverride(
-  'HttpConfig',
+#### 1. Direct Code Deployment（推奨）
+
+```bash
+# AgentCore Starter Toolkit をインストール
+pip install bedrock-agentcore-starter-toolkit
+
+# エージェントを設定
+agentcore configure --entrypoint omikuji_agent.py --name omikuji-agent
+
+# デプロイ（zipファイルをS3にアップロード）
+# → AgentCore Runtimeが自動でエンドポイントを作成
+```
+
+- Dockerファイル不要
+- zipファイル（最大250MB）をS3にアップロード
+- Python 3.10-3.13 対応
+- 迅速なイテレーション
+
+#### 2. Container Deployment（ECR）
+
+```bash
+# Dockerイメージをビルド
+docker build -t omikuji-agent .
+
+# ECRにプッシュ
+aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
+docker tag omikuji-agent:latest $ECR_URI/omikuji-agent:latest
+docker push $ECR_URI/omikuji-agent:latest
+
+# AgentCore Runtimeにデプロイ
+# → AgentCore Runtimeがコンテナを実行しエンドポイントを作成
+```
+
+- カスタム依存関係が必要な場合
+- 最大2GBのパッケージサイズ
+- 多言語対応
+
+### InvokeAgentRuntime API
+
+デプロイ後、以下のAPIでエージェントを呼び出せます：
+
+```
+POST /runtimes/{agentRuntimeArn}/invocations
+
+Headers:
+  Content-Type: application/json
+  Accept: application/json
+  X-Amzn-Bedrock-AgentCore-Runtime-Session-Id: {sessionId}
+
+Body:
   {
-    Endpoint: AGENTCORE_ENDPOINT,
-    AuthorizationConfig: {
-      AuthorizationType: 'AWS_IAM',
-      AwsIamConfig: {
-        SigningRegion: 'ap-northeast-1',
-        SigningServiceName: 'bedrock-agentcore',
-      },
-    },
+    "prompt": "おみくじを引きたい！"
   }
-);
-
-// IAM Policy for AgentCore
-const agentCorePolicy = new Policy(dataStack, 'AgentCorePolicy', {
-  statements: [
-    new PolicyStatement({
-      actions: ['bedrock-agentcore:InvokeAgentRuntime'],
-      resources: [AGENTCORE_RUNTIME_ARN],
-    }),
-  ],
-});
-
-backend.data.resources.graphqlApi.applyRemovalPolicy(
-  agentCorePolicy
-);
 ```
 
-### 2. data/resource.ts - Schema 定義
+## 現在のステータス
 
-```typescript
-// amplify/data/resource.ts
-import { a, defineData, type ClientSchema } from '@aws-amplify/backend';
+### ✅ 完了
 
-const schema = a.schema({
-  // おみくじ結果の型定義
-  FortuneData: a.customType({
-    fortune: a.string().required(),
-    stars: a.string().required(),
-    luckyColor: a.string().required(),
-    luckyItem: a.string().required(),
-    luckySpot: a.string().required(),
-    timestamp: a.string().required(),
-  }),
+- [x] フロントエンド（Next.js静的サイト）をAmplify Hostingにデプロイ
+- [x] モックデータでおみくじ機能動作確認
+- [x] UIデザイン完成
 
-  OmikujiResponse: a.customType({
-    result: a.string().required(),
-    fortuneData: a.ref('FortuneData'),
-  }),
+### 🚧 TODO: AgentCore Runtime デプロイ
 
-  // AgentCore を直接呼び出すカスタムクエリ
-  drawOmikuji: a
-    .query()
-    .arguments({
-      prompt: a.string().default('おみくじを引きたい'),
-      sessionId: a.string(),
-    })
-    .returns(a.ref('OmikujiResponse'))
-    .authorization((allow) => [allow.authenticated()])
-    .handler(
-      a.handler.custom({
-        dataSource: 'AgentCoreHttpDataSource',
-        entry: './resolvers/drawOmikuji.js',
-      })
-    ),
+1. **omikuji_agent.py を AgentCore Runtime にデプロイ**
+   ```bash
+   # Starter Toolkit でデプロイ
+   agentcore configure --entrypoint omikuji_agent.py --name omikuji-agent
+   ```
 
-  // チャット用クエリ
-  chat: a
-    .query()
-    .arguments({
-      message: a.string().required(),
-      sessionId: a.string(),
-    })
-    .returns(a.string())
-    .authorization((allow) => [allow.authenticated()])
-    .handler(
-      a.handler.custom({
-        dataSource: 'AgentCoreHttpDataSource',
-        entry: './resolvers/chat.js',
-      })
-    ),
-});
+2. **デプロイ後、Runtime ARN を取得**
+   ```
+   arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/omikuji-agent-xxxxx
+   ```
 
-export type Schema = ClientSchema<typeof schema>;
-export const data = defineData({
-  schema,
-  authorizationModes: {
-    defaultAuthorizationMode: 'userPool',
-  },
-});
-```
-
-### 3. resolvers/drawOmikuji.js - AppSync JS Resolver
-
-```javascript
-// amplify/data/resolvers/drawOmikuji.js
-import { util } from '@aws-appsync/utils';
-
-const AGENT_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
-
-export function request(ctx) {
-  const { prompt, sessionId } = ctx.args;
-  const runtimeSessionId = sessionId || `session-${util.autoId()}`;
-  
-  return {
-    method: 'POST',
-    resourcePath: `/runtimes/${AGENT_RUNTIME_ARN}/invocations`,
-    params: {
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': runtimeSessionId,
-      },
-      body: JSON.stringify({
-        prompt: prompt || 'おみくじを引きたい',
-      }),
-    },
-  };
-}
-
-export function response(ctx) {
-  const { error, result } = ctx;
-  
-  if (error) {
-    return util.error(error.message, error.type);
-  }
-  
-  const body = JSON.parse(result.body);
-  
-  return {
-    result: body.result,
-    fortuneData: body.fortune_data,
-  };
-}
-```
-
-### 4. フロントエンド呼び出し
-
-```typescript
-// app/page.tsx
-'use client';
-
-import { generateClient } from 'aws-amplify/data';
-import type { Schema } from '@/amplify/data/resource';
-
-const client = generateClient<Schema>();
-
-export default function OmikujiPage() {
-  const [result, setResult] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-
-  const drawOmikuji = async () => {
-    setLoading(true);
-    try {
-      const response = await client.queries.drawOmikuji({
-        prompt: 'おみくじ引きたい～！',
-      });
-      
-      if (response.data) {
-        setResult(response.data.result);
-        console.log('Fortune:', response.data.fortuneData);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div>
-      <button onClick={drawOmikuji} disabled={loading}>
-        {loading ? '占い中...' : 'おみくじを引く！'}
-      </button>
-      {result && <p>{result}</p>}
-    </div>
-  );
-}
-```
+3. **フロントエンドから直接呼び出し**
+   - API Gateway経由、または
+   - Cognito認証 + AWS SDK でブラウザから直接呼び出し
 
 ## 技術スタック
 
-### バックエンド
-| 技術 | 用途 | バージョン |
-|------|------|-----------|
-| AWS Bedrock AgentCore Runtime | AIエージェント基盤 | Runtime |
-| AWS AppSync | GraphQL API | Amplify Gen2 |
-| Strands Agents SDK | エージェントフレームワーク | Latest |
-| AWS Bedrock Claude | メッセージ生成 | Sonnet 4 / Haiku 3 |
-| AgentCore Memory | 会話履歴保持 | Built-in |
-
-### フロントエンド
-| 技術 | 用途 | バージョン |
-|------|------|-----------|
-| Next.js (Amplify Gen2) | フロントエンド | 14.x |
-| AWS Amplify Data | データクライアント | Gen2 |
-| TailwindCSS | スタイリング | 3.x |
-| Chart.js | グラフ描画 | Latest |
-
-### インフラストラクチャ
+### バックエンド（AgentCore Runtime）
 | 技術 | 用途 |
 |------|------|
-| AWS Amplify Gen2 | ホスティング・Backend・CI/CD |
-| AgentCore Starter Toolkit | エージェントデプロイ CLI |
-| CloudWatch Logs | ログ監視 |
+| Amazon Bedrock AgentCore Runtime | AIエージェントホスティング |
+| Strands Agents SDK | エージェントフレームワーク |
+| AWS Bedrock Claude | LLM (Sonnet 4 / Haiku 3) |
+| AgentCore Memory | 会話履歴保持 |
+| Code Interpreter | 統計分析・グラフ生成 |
+
+### フロントエンド
+| 技術 | 用途 |
+|------|------|
+| Next.js 14 | フロントエンド（静的エクスポート） |
+| AWS Amplify Hosting | ホスティング |
+| TailwindCSS | スタイリング |
 
 ## プロジェクト構成
 
 ```
 omikuji-agent/
-├── README.md                          # このファイル
-├── requirements.txt                   # Python依存関係
+├── README.md                     # このファイル
+├── requirements.txt              # Python依存関係
 │
-├── omikuji_agent.py                   # AgentCore メインエージェント
-├── my_agent.py                        # AgentCore 基礎版エージェント
+├── omikuji_agent.py              # AgentCore Runtime用エージェント ⭐
+├── my_agent.py                   # 基本版エージェント
 │
-├── nextjs-app/                        # Amplify Gen2 アプリ
-│   ├── amplify/                       # Amplify Backend
-│   │   ├── backend.ts                 # Backend 定義 + AgentCore 連携
-│   │   ├── auth/                      # Cognito 認証
-│   │   └── data/                      # AppSync + AgentCore
-│   │       ├── resource.ts            # Schema 定義
-│   │       └── resolvers/             # AppSync JS Resolvers
-│   │           ├── drawOmikuji.js     # おみくじResolver
-│   │           └── chat.js            # チャットResolver
-│   ├── app/                           # Next.js App Router
-│   └── lib/                           # ユーティリティ
+├── nextjs-app/                   # フロントエンド
+│   ├── app/                      # Next.js App Router
+│   │   ├── page.tsx              # メインページ
+│   │   └── layout.tsx            # レイアウト
+│   ├── lib/
+│   │   └── api.ts                # API呼び出し（現在モック）
+│   ├── next.config.js            # 静的エクスポート設定
+│   └── package.json
 │
-├── public/                            # 静的ファイル（代替UI）
-│   └── index.html
-│
-└── amplify.yml                        # Amplify ビルド設定
+├── amplify.yml                   # Amplifyビルド設定
+└── public/                       # 静的ファイル
 ```
 
 ## セットアップ
@@ -342,85 +212,35 @@ omikuji-agent/
 ### 前提条件
 - AWS アカウント
 - AWS CLI v2 設定済み
+- Python 3.10-3.13
 - Node.js 18+
-- Python 3.12+
 
-### 1. AgentCore エージェントの準備
+### 1. AgentCore Runtime にエージェントをデプロイ
 
-AWS Console で AgentCore Runtime エージェントを作成し、ARN を取得します。
+```bash
+# 依存関係インストール
+pip install bedrock-agentcore strands-agents bedrock-agentcore-starter-toolkit
 
+# デプロイ設定
+agentcore configure --entrypoint omikuji_agent.py --name omikuji-agent
+
+# デプロイタイプ選択: 1. Code Zip (recommended)
+# S3バケットを指定してデプロイ
 ```
-# エージェント ARN 例
-arn:aws:bedrock-agentcore:ap-northeast-1:123456789012:runtime/my_agent-xxx
-```
 
-### 2. Amplify Gen2 アプリのセットアップ
+### 2. フロントエンド起動（ローカル）
 
 ```bash
 cd nextjs-app
 npm install
-
-# Amplify Sandbox 起動（開発環境）
-npx ampx sandbox
-
-# 別ターミナルで Next.js 起動
 npm run dev
 ```
 
-### 3. AgentCore 連携設定
-
-`amplify/backend.ts` で AgentCore Runtime ARN を設定します（上記「Amplify Gen2 + AgentCore 連携の実装」参照）。
-
-### 4. 本番デプロイ
+### 3. 本番デプロイ
 
 ```bash
-# Git にプッシュ → Amplify Hosting が自動デプロイ
+# GitHubにプッシュ → Amplify Hostingが自動デプロイ
 git push origin main
-
-# または CLI でデプロイ
-npx ampx pipeline-deploy --branch main
-```
-
-## API リファレンス
-
-### GraphQL Queries
-
-```graphql
-# おみくじを引く
-query DrawOmikuji($prompt: String, $sessionId: String) {
-  drawOmikuji(prompt: $prompt, sessionId: $sessionId) {
-    result
-    fortuneData {
-      fortune
-      stars
-      luckyColor
-      luckyItem
-      luckySpot
-      timestamp
-    }
-  }
-}
-
-# AIとチャット
-query Chat($message: String!, $sessionId: String) {
-  chat(message: $message, sessionId: $sessionId)
-}
-```
-
-### TypeScript Client
-
-```typescript
-// おみくじを引く
-const { data } = await client.queries.drawOmikuji({
-  prompt: 'おみくじ引きたい～！',
-  sessionId: 'user-session-123',
-});
-
-// チャット
-const { data } = await client.queries.chat({
-  message: '今日の運勢どう？',
-  sessionId: 'user-session-123',
-});
 ```
 
 ## 機能一覧
@@ -435,57 +255,13 @@ const { data } = await client.queries.chat({
 - 🧠 **Memory**: 会話履歴を保持し、パーソナライズされた応答
 - 🐍 **Code Interpreter**: 統計分析やグラフ生成
 - 🔍 **Observability**: CloudWatch GenAI Dashboard でリアルタイム監視
-- 🛡️ **Policy Controls**: エージェントの動作制御
-
-## トラブルシューティング
-
-### よくある問題
-
-#### 1. AppSync から AgentCore への接続エラー
-
-```
-解決策: 
-- IAM Policy に bedrock-agentcore:InvokeAgentRuntime 権限を追加
-- HTTP Data Source の署名設定を確認（SigningServiceName: 'bedrock-agentcore'）
-```
-
-#### 2. セッション管理エラー
-
-```
-解決策:
-- X-Amzn-Bedrock-AgentCore-Runtime-Session-Id ヘッダーを必ず設定
-- セッションIDは一意な値を使用（UUID推奨）
-```
-
-#### 3. Claude モデルアクセスエラー
-
-```
-解決策: AWS Console → Bedrock → Model access で
-Claude Sonnet 4 または Claude 3 Haiku のアクセスを有効化
-```
-
-#### 4. ストリーミングレスポンス
-
-```
-注意: AppSync は現在ストリーミングをサポートしていません
-長時間のレスポンスが必要な場合は、WebSocket Subscriptions の使用を検討
-```
-
-## ロードマップ
-
-- [x] Amplify Gen2 + AgentCore 直接連携
-- [ ] WebSocket によるストリーミング対応
-- [ ] Agent-to-Agent Protocol 連携
-- [ ] おみくじ履歴のDynamoDB永続化
-- [ ] SNSシェア機能
-- [ ] 多言語対応
 
 ## 参考リンク
 
 - [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/)
-- [Amplify Gen2 - Connect to Amazon Bedrock](https://docs.amplify.aws/react/build-a-backend/data/custom-business-logic/connect-bedrock/)
-- [Amplify Gen2 - HTTP Data Source](https://docs.amplify.aws/react/build-a-backend/data/custom-business-logic/connect-http-datasource/)
-- [AgentCore InvokeAgentRuntime API](https://docs.aws.amazon.com/bedrock-agentcore/latest/APIReference/API_InvokeAgentRuntime.html)
+- [AgentCore Runtime ドキュメント](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
+- [AgentCore Runtime Direct Code Deployment](https://aws.amazon.com/blogs/machine-learning/iterate-faster-with-amazon-bedrock-agentcore-runtime-direct-code-deployment/)
+- [InvokeAgentRuntime API](https://docs.aws.amazon.com/bedrock-agentcore/latest/APIReference/API_InvokeAgentRuntime.html)
 - [Strands Agents SDK](https://strandsagents.com/latest/)
 
 ## ライセンス
@@ -498,5 +274,4 @@ Made with 💕
 
 ---
 
-**エンドポイント**
-- AgentCore ARN: `arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz`
+**デプロイ済みフロントエンド**: https://main.d41aq4729k4l7.amplifyapp.com
