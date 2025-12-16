@@ -14,19 +14,7 @@
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "@aws-sdk/client-bedrock-agent-runtime": "^3.943.0",
-    "@aws-sdk/client-lambda": "^3.943.0",
-    "@aws-amplify/backend": "^1.8.0",
-    "@aws-amplify/backend-cli": "^1.8.0",
-    "@aws-amplify/backend-auth": "^1.0.0",
-    "@aws-amplify/backend-data": "^1.0.0",
-    "@aws-amplify/backend-function": "^1.0.0",
-    "aws-amplify": "^6.11.0",
-    "@aws-amplify/adapter-nextjs": "^1.2.0",
-    "aws-cdk-lib": "^2.167.0",
-    "constructs": "^10.4.2",
-    "tsx": "^4.0.0",
-    "esbuild": "^0.20.0"
+    "@aws-sdk/client-bedrock-agentcore": "latest"
   },
   "devDependencies": {
     "@types/node": "^20",

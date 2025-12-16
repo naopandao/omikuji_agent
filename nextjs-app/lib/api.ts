@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * おみくじAPI - シンプルなモック実装
- * 後でAgentCore連携を追加予定
+ * おみくじAPI - AgentCore Runtime連携版
  */
 
 export interface FortuneData {
@@ -20,30 +19,85 @@ export interface OmikujiResponse {
   sessionId: string;
 }
 
-// おみくじの運勢データ
-const FORTUNES = ['大吉', '中吉', '小吉', '吉', '末吉', '凶'];
-const COLORS = ['ピンク', '水色', 'ラベンダー', 'ミントグリーン', 'コーラル', 'ゴールド', 'シルバー'];
-const ITEMS = ['リップグロス', 'ミラー', 'お気に入りのアクセ', 'ハンドクリーム', '推しのグッズ', 'パワーストーン'];
-const SPOTS = ['カフェ', 'ショッピングモール', '公園', '神社', '映画館', '図書館', 'おしゃれなレストラン'];
-
 /**
- * おみくじを引く - ローカルでランダム生成
+ * おみくじを引く - AgentCore Runtimeを呼び出し
  */
 export async function fetchOmikuji(): Promise<OmikujiResponse> {
-  // 少し待つ（演出用）
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  const sessionId = `omikuji-${Date.now()}`;
+
+  try {
+    const response = await fetch('/api/omikuji', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: 'おみくじを引いてください',
+        sessionId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || 'Unknown error');
+    }
+
+    // AgentCoreからの応答を整形
+    const agentResponse = data.data;
+    
+    // fortune_dataを変換
+    const fortuneData: FortuneData = {
+      fortune: agentResponse.fortune_data?.fortune || '吉',
+      stars: agentResponse.fortune_data?.stars || '★★★☆☆',
+      luckyColor: agentResponse.fortune_data?.lucky_color || 'ピンク',
+      luckyItem: agentResponse.fortune_data?.lucky_item || 'お気に入りのアクセ',
+      luckySpot: agentResponse.fortune_data?.lucky_spot || 'カフェ',
+      timestamp: agentResponse.fortune_data?.timestamp || new Date().toISOString(),
+    };
+
+    // resultからテキスト部分を抽出
+    let resultText = agentResponse.result;
+    if (typeof resultText === 'string' && resultText.includes('content')) {
+      try {
+        // AgentCoreの応答フォーマットをパース
+        const parsed = JSON.parse(resultText.replace(/'/g, '"').replace(/\\n/g, '\n'));
+        if (parsed.content?.[0]?.text) {
+          resultText = parsed.content[0].text;
+        }
+      } catch {
+        // パース失敗時はそのまま使用
+      }
+    }
+
+    return {
+      result: resultText,
+      fortune_data: fortuneData,
+      sessionId,
+    };
+
+  } catch (error) {
+    console.error('Failed to fetch omikuji:', error);
+    // フォールバック: モックデータを返す
+    return getFallbackOmikuji(sessionId);
+  }
+}
+
+/**
+ * フォールバック用モックデータ
+ */
+function getFallbackOmikuji(sessionId: string): OmikujiResponse {
+  const FORTUNES = ['大吉', '中吉', '小吉', '吉', '末吉', '凶'];
+  const COLORS = ['ピンク', '水色', 'ラベンダー', 'ミントグリーン', 'コーラル', 'ゴールド'];
+  const ITEMS = ['リップグロス', 'ミラー', 'お気に入りのアクセ', 'ハンドクリーム', '推しのグッズ'];
+  const SPOTS = ['カフェ', 'ショッピングモール', '公園', '神社', '映画館'];
 
   const fortune = FORTUNES[Math.floor(Math.random() * FORTUNES.length)];
   const stars = '★'.repeat(Math.floor(Math.random() * 3) + 3) + '☆'.repeat(2);
-  
-  const fortuneData: FortuneData = {
-    fortune,
-    stars,
-    luckyColor: COLORS[Math.floor(Math.random() * COLORS.length)],
-    luckyItem: ITEMS[Math.floor(Math.random() * ITEMS.length)],
-    luckySpot: SPOTS[Math.floor(Math.random() * SPOTS.length)],
-    timestamp: new Date().toISOString(),
-  };
 
   const messages: Record<string, string> = {
     '大吉': '✨ やばい！めっちゃ最高の運勢じゃん！今日は何やってもうまくいくから、思い切ってチャレンジしちゃお！💕',
@@ -56,8 +110,15 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
 
   return {
     result: messages[fortune] || 'おみくじの結果です！',
-    fortune_data: fortuneData,
-    sessionId: `omikuji-${Date.now()}`,
+    fortune_data: {
+      fortune,
+      stars,
+      luckyColor: COLORS[Math.floor(Math.random() * COLORS.length)],
+      luckyItem: ITEMS[Math.floor(Math.random() * ITEMS.length)],
+      luckySpot: SPOTS[Math.floor(Math.random() * SPOTS.length)],
+      timestamp: new Date().toISOString(),
+    },
+    sessionId,
   };
 }
 
