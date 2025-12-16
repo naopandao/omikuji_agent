@@ -107,9 +107,9 @@ export default function Home() {
 
         {/* 説明 */}
         <div className="text-center text-sm text-gray-500 mt-12">
-          <p>Powered by AWS Bedrock AgentCore 💕</p>
+          <p>おみくじエージェント 💕</p>
           <p className="mt-1">
-            Next.js + Amplify Gen2 + TypeScript
+            Next.js + TypeScript
           </p>
         </div>
       </div>

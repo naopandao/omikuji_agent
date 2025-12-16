@@ -1,12 +1,6 @@
 version: 1
 applications:
   - appRoot: nextjs-app
-    backend:
-      phases:
-        build:
-          commands:
-            - npm install
-            - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
     frontend:
       phases:
         preBuild:
@@ -15,13 +9,10 @@ applications:
         build:
           commands:
             - npm run build
-            - cp -r public .next/standalone/public || true
-            - cp -r .next/static .next/standalone/.next/static || true
       artifacts:
-        baseDirectory: .next/standalone
+        baseDirectory: out
         files:
           - '**/*'
       cache:
         paths:
-          - .next/cache/**/*
           - node_modules/**/*

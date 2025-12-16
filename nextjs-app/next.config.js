@@ -1,12 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Amplify Hosting 用の設定
-  output: 'standalone',
-  // 画像最適化の設定
+  // 静的エクスポート（SSGモード）
+  output: 'export',
+  // 画像最適化を無効化（静的サイト用）
   images: {
-    domains: [],
+    unoptimized: true,
   },
+  // トレイリングスラッシュを有効化
+  trailingSlash: true,
 };
 
 module.exports = nextConfig;
