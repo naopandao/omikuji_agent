@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runWithAmplifyServerContext } from '@/lib/amplify-server';
-import { Lambda } from '@aws-sdk/client-lambda';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 
 /**
  * おみくじ API Route
- * Amplify の Lambda Function を呼び出す
+ * Lambda Function を直接呼び出す
  */
 
-const lambda = new Lambda({
+const lambdaClient = new LambdaClient({
   region: process.env.AWS_REGION || 'ap-northeast-1',
 });
 
@@ -18,34 +17,27 @@ export async function POST(request: NextRequest) {
 
     console.log('[Omikuji API] Request:', { userId });
 
-    // Amplify の Lambda Function を呼び出し
-    const result = await runWithAmplifyServerContext({
-      nextServerContext: { request },
-      operation: async (contextSpec) => {
-        // Lambda Function 名は Amplify が自動生成
-        // 実際の Function 名に置き換える必要あり
-        const functionName = process.env.OMIKUJI_FUNCTION_NAME || 'omikuji';
+    // Lambda Function を直接呼び出す
+    const functionName = process.env.OMIKUJI_FUNCTION_NAME || 'omikuji';
 
-        const response = await lambda.invoke({
-          FunctionName: functionName,
-          Payload: JSON.stringify({
-            userId,
-            sessionId: `omikuji-${Date.now()}`,
-          }),
-        });
-
-        if (response.Payload) {
-          const payload = JSON.parse(
-            new TextDecoder().decode(response.Payload)
-          );
-          return payload;
-        }
-
-        throw new Error('No payload returned from Lambda');
-      },
+    const command = new InvokeCommand({
+      FunctionName: functionName,
+      Payload: JSON.stringify({
+        userId,
+        sessionId: `omikuji-${Date.now()}`,
+      }),
     });
 
-    return NextResponse.json(result);
+    const response = await lambdaClient.send(command);
+
+    if (response.Payload) {
+      const payload = JSON.parse(
+        new TextDecoder().decode(response.Payload)
+      );
+      return NextResponse.json(payload);
+    }
+
+    throw new Error('No payload returned from Lambda');
   } catch (error) {
     console.error('[Omikuji API] Error:', error);
     return NextResponse.json(
