@@ -1,7 +1,13 @@
 'use client';
 
 /**
- * おみくじAPI - AgentCore Runtime連携版
+ * おみくじAPI - Next.js API Route → AgentCore Runtime
+ * 
+ * アーキテクチャ:
+ * フロントエンド → /api/omikuji (Server Side) → AgentCore Runtime
+ * 
+ * TODO: Amplify Gen2 + AppSync への移行
+ * 現在はSSR API Routeで実装、将来的にAppSync HTTP Data Sourceに移行予定
  */
 
 export interface FortuneData {
@@ -19,17 +25,14 @@ export interface OmikujiResponse {
   sessionId: string;
 }
 
-// API Gateway エンドポイント（AgentCore連携）
-const API_ENDPOINT = 'https://ist2rm1828.execute-api.ap-northeast-1.amazonaws.com/prod/omikuji';
-
 /**
- * おみくじを引く - AgentCore Runtimeを呼び出し
+ * おみくじを引く - API Route → AgentCore Runtime
  */
 export async function fetchOmikuji(): Promise<OmikujiResponse> {
   const sessionId = `omikuji-${Date.now()}`;
 
   try {
-    const response = await fetch(API_ENDPOINT, {
+    const response = await fetch('/api/omikuji', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -41,46 +44,19 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
 
-    if (!data.success) {
-      throw new Error(data.error || 'Unknown error');
-    }
-
-    // AgentCoreからの応答を整形
-    const agentResponse = data.data;
-    
-    // fortune_dataを変換
-    const fortuneData: FortuneData = {
-      fortune: agentResponse.fortune_data?.fortune || '吉',
-      stars: agentResponse.fortune_data?.stars || '★★★☆☆',
-      luckyColor: agentResponse.fortune_data?.lucky_color || 'ピンク',
-      luckyItem: agentResponse.fortune_data?.lucky_item || 'お気に入りのアクセ',
-      luckySpot: agentResponse.fortune_data?.lucky_spot || 'カフェ',
-      timestamp: agentResponse.fortune_data?.timestamp || new Date().toISOString(),
-    };
-
-    // resultからテキスト部分を抽出
-    let resultText = agentResponse.result;
-    if (typeof resultText === 'string' && resultText.includes('content')) {
-      try {
-        // AgentCoreの応答フォーマットをパース
-        const parsed = JSON.parse(resultText.replace(/'/g, '"').replace(/\\n/g, '\n'));
-        if (parsed.content?.[0]?.text) {
-          resultText = parsed.content[0].text;
-        }
-      } catch {
-        // パース失敗時はそのまま使用
-      }
+    if (data.error) {
+      throw new Error(data.error);
     }
 
     return {
-      result: resultText,
-      fortune_data: fortuneData,
-      sessionId,
+      result: data.result || '',
+      fortune_data: data.fortune_data || getFallbackFortuneData(),
+      sessionId: data.sessionId || sessionId,
     };
 
   } catch (error) {
@@ -88,6 +64,54 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
     // フォールバック: モックデータを返す
     return getFallbackOmikuji(sessionId);
   }
+}
+
+/**
+ * AIとチャット - API Route → AgentCore Runtime
+ */
+export async function sendChatMessage(message: string, sessionId?: string): Promise<string> {
+  try {
+    const response = await fetch('/api/omikuji', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: message,
+        sessionId: sessionId || `chat-${Date.now()}`,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.result || '';
+
+  } catch (error) {
+    console.error('Failed to send chat message:', error);
+    return 'ごめんね、今ちょっと調子悪いみたい...もう一回試してみて！💦';
+  }
+}
+
+/**
+ * フォールバック用FortuneData
+ */
+function getFallbackFortuneData(): FortuneData {
+  const FORTUNES = ['大吉', '中吉', '小吉', '吉', '末吉', '凶'];
+  const COLORS = ['ピンク', '水色', 'ラベンダー', 'ミントグリーン', 'コーラル', 'ゴールド'];
+  const ITEMS = ['リップグロス', 'ミラー', 'お気に入りのアクセ', 'ハンドクリーム', '推しのグッズ'];
+  const SPOTS = ['カフェ', 'ショッピングモール', '公園', '神社', '映画館'];
+
+  return {
+    fortune: FORTUNES[Math.floor(Math.random() * FORTUNES.length)],
+    stars: '★'.repeat(Math.floor(Math.random() * 3) + 3) + '☆'.repeat(2),
+    luckyColor: COLORS[Math.floor(Math.random() * COLORS.length)],
+    luckyItem: ITEMS[Math.floor(Math.random() * ITEMS.length)],
+    luckySpot: SPOTS[Math.floor(Math.random() * SPOTS.length)],
+    timestamp: new Date().toISOString(),
+  };
 }
 
 /**
