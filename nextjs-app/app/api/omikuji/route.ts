@@ -54,10 +54,48 @@ export async function POST(request: NextRequest) {
       parsedResult = { result: resultStr };
     }
 
+    // AgentCoreのレスポンス形式を解析
+    // parsedResult.result が文字列の場合、さらにJSONパースが必要な場合がある
+    let aiMessage = '';
+    let fortuneData = parsedResult.fortune_data || null;
+
+    // result が {'role': 'assistant', 'content': [{'text': '...'}]} 形式の場合
+    if (parsedResult.result && typeof parsedResult.result === 'string') {
+      try {
+        // 文字列化されたJSONをパース
+        const resultObj = JSON.parse(parsedResult.result.replace(/'/g, '"'));
+        if (resultObj.content && Array.isArray(resultObj.content)) {
+          aiMessage = resultObj.content.map((c: { text?: string }) => c.text || '').join('\n');
+        } else {
+          aiMessage = parsedResult.result;
+        }
+      } catch {
+        // パース失敗時はそのまま使用
+        aiMessage = parsedResult.result;
+      }
+    } else if (parsedResult.result?.content) {
+      // 直接オブジェクトの場合
+      aiMessage = parsedResult.result.content.map((c: { text?: string }) => c.text || '').join('\n');
+    } else {
+      aiMessage = resultStr;
+    }
+
+    // fortune_data のキー名を正規化（snake_case → camelCase）
+    if (fortuneData) {
+      fortuneData = {
+        fortune: fortuneData.fortune,
+        stars: fortuneData.stars,
+        luckyColor: fortuneData.lucky_color || fortuneData.luckyColor,
+        luckyItem: fortuneData.lucky_item || fortuneData.luckyItem,
+        luckySpot: fortuneData.lucky_spot || fortuneData.luckySpot,
+        timestamp: fortuneData.timestamp || new Date().toISOString(),
+      };
+    }
+
     // フロントエンドが期待する形式で返す
     return NextResponse.json({
-      result: parsedResult.result || resultStr,
-      fortune_data: parsedResult.fortune_data || null,
+      result: aiMessage,
+      fortune_data: fortuneData,
       sessionId: requestSessionId,
     });
 
