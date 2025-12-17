@@ -381,13 +381,41 @@ export function response(ctx) {
 - [x] AgentCore Runtime デプロイ済み（my_agent-9NBXM54pmz）
 - [x] ローカルでのAgentCore Runtime呼び出しテスト成功
 - [x] フロントエンドUI完成
-- [x] Amplify Hostingにデプロイ
+- [x] Amplify Hosting にデプロイ（SSR / WEB_COMPUTE）
+- [x] Next.js API Route 実装（/api/omikuji）
+- [x] フォールバック機能実装（AgentCore接続失敗時のモックデータ）
+
+### 🟡 現在の状態
+フロントエンドは動作中ですが、AgentCore との接続には追加のIAM設定が必要です：
+
+| コンポーネント | 状態 | 備考 |
+|--------------|------|------|
+| フロントエンド | ✅ 稼働中 | https://main.d41aq4729k4l7.amplifyapp.com |
+| API Route | ✅ 稼働中 | フォールバックモード |
+| AgentCore Runtime | ✅ READY | 権限設定待ち |
+| Amplify Compute Role | ⚠️ 要設定 | bedrock-agentcore:InvokeAgentRuntime 権限必要 |
 
 ### 🚧 TODO
+- [ ] **Amplify SSR Compute Role** に AgentCore 呼び出し権限を追加
 - [ ] Amplify Gen2 Backend（AppSync + HTTP Data Source）構築
 - [ ] Cognito認証連携
 - [ ] DynamoDB履歴保存
-- [ ] 本番環境での完全連携
+- [ ] 本番環境での完全AgentCore連携
+
+### 現行アーキテクチャ（暫定）
+
+```
+Client → Amplify Hosting (Next.js SSR) → API Route → AgentCore Runtime
+                                         ↓
+                                    [フォールバック]
+                                    モックデータ
+```
+
+### 目標アーキテクチャ（READMEに記載）
+
+```
+Client → Amplify Gen2 → AppSync → HTTP Data Source → AgentCore Runtime
+```
 
 ### AgentCore Runtime 情報
 
