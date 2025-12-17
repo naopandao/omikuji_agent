@@ -19,6 +19,9 @@ export interface OmikujiResponse {
   sessionId: string;
 }
 
+// API Gateway エンドポイント（AgentCore連携）
+const API_ENDPOINT = 'https://ist2rm1828.execute-api.ap-northeast-1.amazonaws.com/prod/omikuji';
+
 /**
  * おみくじを引く - AgentCore Runtimeを呼び出し
  */
@@ -26,7 +29,7 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
   const sessionId = `omikuji-${Date.now()}`;
 
   try {
-    const response = await fetch('/api/omikuji', {
+    const response = await fetch(API_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
