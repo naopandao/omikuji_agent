@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { fetchOmikuji, saveFortuneResult, type FortuneData } from '@/lib/api';
+import { fetchOmikuji, saveFortuneResult, type FortuneData, type OmikujiResponse } from '@/lib/api';
 
 export default function Home() {
   const [fortune, setFortune] = useState<FortuneData | null>(null);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,8 +14,9 @@ export default function Home() {
     setError(null);
 
     try {
-      const result = await fetchOmikuji();
+      const result: OmikujiResponse = await fetchOmikuji();
       setFortune(result.fortune_data);
+      setAiMessage(result.result); // AIからのメッセージを保存
 
       // 履歴に保存
       await saveFortuneResult(result.fortune_data);
@@ -75,6 +77,15 @@ export default function Home() {
               </h2>
               <div className="text-2xl text-yellow-500">{fortune.stars}</div>
             </div>
+
+            {/* AIからのメッセージ */}
+            {aiMessage && (
+              <div className="bg-gradient-to-r from-pink-100 to-purple-100 p-6 rounded-xl mb-6 border-2 border-pink-200">
+                <p className="text-lg text-gray-700 leading-relaxed">
+                  {aiMessage}
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div className="bg-pink-50 p-4 rounded-lg">
