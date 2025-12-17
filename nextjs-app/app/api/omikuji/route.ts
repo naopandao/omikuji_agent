@@ -10,9 +10,12 @@ const AWS_REGION = process.env.AGENTCORE_REGION || 'ap-northeast-1';
  * 直接HTTPリクエストで呼び出す
  */
 export async function POST(request: NextRequest) {
+  let requestSessionId = `fallback-${Date.now()}`;
+  
   try {
     const body = await request.json();
     const { prompt = 'おみくじを引いてください', sessionId } = body;
+    requestSessionId = sessionId || requestSessionId;
 
     // 動的importでAWS SDKを読み込み（SSR互換性のため）
     const { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } = await import('@aws-sdk/client-bedrock-agentcore');
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       result: parsedResult.result || resultStr,
       fortune_data: parsedResult.fortune_data || null,
-      sessionId: sessionId,
+      sessionId: requestSessionId,
     });
 
   } catch (error) {
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       result: getFallbackMessage(),
       fortune_data: getFallbackFortuneData(),
-      sessionId: body?.sessionId || `fallback-${Date.now()}`,
+      sessionId: requestSessionId,
       _fallback: true,
       _error: error instanceof Error ? error.message : 'Unknown error',
     });
