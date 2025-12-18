@@ -52,3 +52,80 @@ body {
 .loading-spinner {
   animation: spin 1s linear infinite;
 }
+
+/* Markdownプレビュー用スタイル */
+.prose {
+  @apply text-gray-700;
+}
+
+.prose h1 {
+  @apply text-2xl font-bold text-purple-600 mb-3 pb-2 border-b-2 border-purple-200;
+}
+
+.prose h2 {
+  @apply text-xl font-bold text-pink-600 mb-2 mt-4;
+}
+
+.prose h3 {
+  @apply text-lg font-semibold text-purple-500 mb-2 mt-3;
+}
+
+.prose p {
+  @apply text-gray-700 leading-relaxed mb-3;
+}
+
+.prose strong {
+  @apply font-bold text-purple-600;
+}
+
+.prose em {
+  @apply text-pink-600 not-italic font-medium;
+}
+
+.prose ul {
+  @apply list-none space-y-2 my-3 pl-0;
+}
+
+.prose li {
+  @apply text-gray-700;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-pink-300 pl-4 my-3 italic text-gray-600 bg-pink-50 py-2 rounded-r;
+}
+
+.prose code {
+  @apply bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-sm;
+}
+
+.prose hr {
+  @apply my-4 border-t-2 border-purple-200;
+}
+
+/* AIメッセージのアニメーション */
+@keyframes message-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.prose > * {
+  animation: message-fade-in 0.3s ease-out;
+  animation-fill-mode: both;
+}
+
+.prose > *:nth-child(1) { animation-delay: 0.1s; }
+.prose > *:nth-child(2) { animation-delay: 0.2s; }
+.prose > *:nth-child(3) { animation-delay: 0.3s; }
+.prose > *:nth-child(4) { animation-delay: 0.4s; }
+.prose > *:nth-child(5) { animation-delay: 0.5s; }
+.prose > *:nth-child(6) { animation-delay: 0.6s; }
+.prose > *:nth-child(7) { animation-delay: 0.7s; }
+.prose > *:nth-child(8) { animation-delay: 0.8s; }
+.prose > *:nth-child(9) { animation-delay: 0.9s; }
+.prose > *:nth-child(10) { animation-delay: 1.0s; }

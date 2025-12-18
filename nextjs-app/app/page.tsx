@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { fetchOmikuji, saveFortuneResult, type FortuneData, type OmikujiResponse } from '@/lib/api';
 
 export default function Home() {
@@ -78,12 +80,84 @@ export default function Home() {
               <div className="text-2xl text-yellow-500">{fortune.stars}</div>
             </div>
 
-            {/* AIからのメッセージ */}
+            {/* AIからのメッセージ（Markdownレンダリング） */}
             {aiMessage && (
-              <div className="bg-gradient-to-r from-pink-100 to-purple-100 p-6 rounded-xl mb-6 border-2 border-pink-200">
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  {aiMessage}
-                </p>
+              <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-6 rounded-xl mb-6 border-2 border-pink-200 shadow-inner">
+                <div className="prose prose-pink max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      // 見出しスタイル
+                      h1: ({ children }) => (
+                        <h1 className="text-2xl font-bold text-purple-600 mb-3 pb-2 border-b-2 border-purple-200">
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-xl font-bold text-pink-600 mb-2 mt-4">
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-lg font-semibold text-purple-500 mb-2 mt-3">
+                          {children}
+                        </h3>
+                      ),
+                      // 段落スタイル
+                      p: ({ children }) => (
+                        <p className="text-gray-700 leading-relaxed mb-3 text-base">
+                          {children}
+                        </p>
+                      ),
+                      // 強調スタイル
+                      strong: ({ children }) => (
+                        <strong className="font-bold text-purple-600 bg-purple-100 px-1 rounded">
+                          {children}
+                        </strong>
+                      ),
+                      em: ({ children }) => (
+                        <em className="text-pink-600 not-italic font-medium">
+                          {children}
+                        </em>
+                      ),
+                      // リストスタイル
+                      ul: ({ children }) => (
+                        <ul className="list-none space-y-2 my-3 pl-2">
+                          {children}
+                        </ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside space-y-2 my-3 pl-2 text-gray-700">
+                          {children}
+                        </ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="flex items-start gap-2 text-gray-700">
+                          <span className="text-pink-400 mt-1">💫</span>
+                          <span>{children}</span>
+                        </li>
+                      ),
+                      // コードブロックスタイル
+                      code: ({ children }) => (
+                        <code className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-sm font-mono">
+                          {children}
+                        </code>
+                      ),
+                      // 引用スタイル
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-pink-300 pl-4 my-3 italic text-gray-600 bg-pink-50 py-2 rounded-r">
+                          {children}
+                        </blockquote>
+                      ),
+                      // 水平線
+                      hr: () => (
+                        <hr className="my-4 border-t-2 border-purple-200" />
+                      ),
+                    }}
+                  >
+                    {aiMessage}
+                  </ReactMarkdown>
+                </div>
               </div>
             )}
 
