@@ -384,34 +384,43 @@ export function response(ctx) {
 - [x] Amplify Hosting にデプロイ（SSR / WEB_COMPUTE）
 - [x] Next.js API Route 実装（/api/omikuji）
 - [x] フォールバック機能実装（AgentCore接続失敗時のモックデータ）
+- [x] **AmplifySSRComputeRole 設定完了** - AgentCore連携動作中！
+- [x] **ギャル語AIメッセージ表示** - 本番稼働中！
 
-### 🟡 現在の状態
-フロントエンドは動作中ですが、AgentCore との接続には追加のIAM設定が必要です：
+### 🟢 現在の状態（本番稼働中）
 
 | コンポーネント | 状態 | 備考 |
 |--------------|------|------|
 | フロントエンド | ✅ 稼働中 | https://main.d41aq4729k4l7.amplifyapp.com |
-| API Route | ✅ 稼働中 | フォールバックモード |
-| AgentCore Runtime | ✅ READY | 権限設定待ち |
-| Amplify Compute Role | ⚠️ 要設定 | bedrock-agentcore:InvokeAgentRuntime 権限必要 |
+| API Route | ✅ 稼働中 | AgentCore連携動作中 |
+| AgentCore Runtime | ✅ READY | ギャル語AI生成中 |
+| Amplify Compute Role | ✅ 設定済み | AmplifySSRComputeRole |
 
-### 🚧 TODO
-- [ ] **Amplify SSR Compute Role** に AgentCore 呼び出し権限を追加
-- [ ] Amplify Gen2 Backend（AppSync + HTTP Data Source）構築
+### 🚧 TODO（将来の拡張）
+- [ ] Amplify Gen2 Backend（AppSync + HTTP Data Source）へ移行
 - [ ] Cognito認証連携
 - [ ] DynamoDB履歴保存
-- [ ] 本番環境での完全AgentCore連携
+- [ ] Memory機能の有効化
 
-### 現行アーキテクチャ（暫定）
+### 現行アーキテクチャ
 
 ```
-Client → Amplify Hosting (Next.js SSR) → API Route → AgentCore Runtime
-                                         ↓
-                                    [フォールバック]
-                                    モックデータ
+┌────────────┐     ┌─────────────────────────────────────┐     ┌─────────────────────┐
+│            │     │        Amplify Hosting              │     │                     │
+│  ブラウザ   │────▶│  Next.js SSR + API Route           │────▶│  AgentCore Runtime  │
+│  (React)   │     │  /api/omikuji                       │     │  (omikuji_agent.py) │
+│            │     │                                     │     │                     │
+└────────────┘     └─────────────────────────────────────┘     └──────────┬──────────┘
+                              │                                           │
+                              │ AmplifySSRComputeRole                     │
+                              │ (IAM認証)                                 ▼
+                              │                                 ┌─────────────────────┐
+                              │                                 │   Bedrock Claude    │
+                              │                                 │   (ギャル語生成)    │
+                              └─────────────────────────────────└─────────────────────┘
 ```
 
-### 目標アーキテクチャ（READMEに記載）
+### 目標アーキテクチャ（将来）
 
 ```
 Client → Amplify Gen2 → AppSync → HTTP Data Source → AgentCore Runtime
@@ -422,6 +431,90 @@ Client → Amplify Gen2 → AppSync → HTTP Data Source → AgentCore Runtime
 - **Runtime ARN**: `arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz`
 - **エンドポイント**: DEFAULT (READY)
 - **ステータス**: READY
+
+## デプロイシーケンス図
+
+おみくじを引く際の処理フローです。
+
+```
+┌──────────┐     ┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌───────────────┐
+│ ブラウザ  │     │  Amplify    │     │  API Route      │     │  AgentCore      │     │  Bedrock      │
+│ (React)  │     │  Hosting    │     │  /api/omikuji   │     │  Runtime        │     │  Claude       │
+└────┬─────┘     └──────┬──────┘     └───────┬─────────┘     └───────┬─────────┘     └───────┬───────┘
+     │                  │                    │                       │                       │
+     │  1. ページアクセス │                    │                       │                       │
+     │ ─────────────────>│                    │                       │                       │
+     │                  │                    │                       │                       │
+     │  2. Next.js SSR  │                    │                       │                       │
+     │ <─────────────────│                    │                       │                       │
+     │    (HTML/JS)     │                    │                       │                       │
+     │                  │                    │                       │                       │
+     │  3. 「おみくじを引く」ボタンクリック      │                       │                       │
+     │ ──────────────────────────────────────>│                       │                       │
+     │    POST /api/omikuji                  │                       │                       │
+     │    {prompt, sessionId}                │                       │                       │
+     │                  │                    │                       │                       │
+     │                  │                    │  4. InvokeAgentRuntime│                       │
+     │                  │                    │ ─────────────────────>│                       │
+     │                  │                    │   (AWS SDK v3)        │                       │
+     │                  │                    │   AmplifySSRComputeRole│                      │
+     │                  │                    │                       │                       │
+     │                  │                    │                       │  5. omikuji_agent.py │
+     │                  │                    │                       │ ─────────────────────>│
+     │                  │                    │                       │    Agent(prompt)     │
+     │                  │                    │                       │                       │
+     │                  │                    │                       │  6. AI生成（ギャル語）│
+     │                  │                    │                       │ <─────────────────────│
+     │                  │                    │                       │    {result, fortune} │
+     │                  │                    │                       │                       │
+     │                  │                    │  7. Streaming Response│                       │
+     │                  │                    │ <─────────────────────│                       │
+     │                  │                    │    JSON chunks        │                       │
+     │                  │                    │                       │                       │
+     │  8. JSONレスポンス │                    │                       │                       │
+     │ <──────────────────────────────────────│                       │                       │
+     │    {result, fortune_data, sessionId}  │                       │                       │
+     │                  │                    │                       │                       │
+     │  9. UI更新       │                    │                       │                       │
+     │    - 運勢表示    │                    │                       │                       │
+     │    - AIメッセージ │                    │                       │                       │
+     │    - ラッキー情報 │                    │                       │                       │
+     │                  │                    │                       │                       │
+```
+
+### 各ステップの詳細
+
+| Step | 処理 | ファイル | 説明 |
+|------|------|----------|------|
+| 1-2 | ページ表示 | `page.tsx` | Next.js SSRでHTMLを生成 |
+| 3 | ボタンクリック | `lib/api.ts` | `fetchOmikuji()` で API呼び出し |
+| 4 | AgentCore呼び出し | `route.ts` | AWS SDK v3 で `InvokeAgentRuntimeCommand` |
+| 5-6 | AI生成 | `omikuji_agent.py` | Strands Agent + Bedrock Claude |
+| 7-8 | レスポンス | `route.ts` | JSONパース・正規化 |
+| 9 | UI更新 | `page.tsx` | React state更新・表示 |
+
+### IAM認証フロー
+
+```
+Amplify SSR 実行環境
+        │
+        │ AssumeRole
+        ▼
+┌─────────────────────────┐
+│ AmplifySSRComputeRole   │
+│                         │
+│ Policy:                 │
+│ bedrock-agentcore:      │
+│   InvokeAgentRuntime    │
+│                         │
+│ Resource:               │
+│ arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/*
+└───────────┬─────────────┘
+            │
+            ▼
+    AgentCore Runtime
+    (my_agent-9NBXM54pmz)
+```
 
 ## トラブルシューティング
 
