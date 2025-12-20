@@ -129,3 +129,28 @@ body {
 .prose > *:nth-child(8) { animation-delay: 0.8s; }
 .prose > *:nth-child(9) { animation-delay: 0.9s; }
 .prose > *:nth-child(10) { animation-delay: 1.0s; }
+
+/* ラッキーカードアニメーション */
+@keyframes lucky-card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lucky-card {
+  animation: lucky-card-appear 0.4s ease-out;
+  animation-fill-mode: both;
+}
+
+.lucky-card:nth-child(1) { animation-delay: 0.2s; }
+.lucky-card:nth-child(2) { animation-delay: 0.3s; }
+.lucky-card:nth-child(3) { animation-delay: 0.4s; }
+
+.lucky-card:hover {
+  transform: translateY(-2px);
+}

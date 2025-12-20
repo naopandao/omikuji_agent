@@ -161,30 +161,34 @@ export default function Home() {
               </div>
             )}
 
-            <div className="space-y-4">
-              <div className="bg-pink-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">ラッキーカラー</p>
-                <p className="text-xl font-bold text-pink-600">
-                  🎨 {fortune.luckyColor}
+            {/* ラッキー情報カード */}
+            <div className="grid grid-cols-3 gap-3 mt-6">
+              <div className="lucky-card bg-gradient-to-br from-pink-100 to-pink-50 p-4 rounded-xl text-center border border-pink-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className="text-3xl mb-2">🎨</div>
+                <p className="text-xs text-gray-500 mb-1">カラー</p>
+                <p className="text-sm font-bold text-pink-600">
+                  {fortune.luckyColor}
                 </p>
               </div>
 
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">ラッキーアイテム</p>
-                <p className="text-xl font-bold text-purple-600">
-                  ✨ {fortune.luckyItem}
+              <div className="lucky-card bg-gradient-to-br from-purple-100 to-purple-50 p-4 rounded-xl text-center border border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className="text-3xl mb-2">✨</div>
+                <p className="text-xs text-gray-500 mb-1">アイテム</p>
+                <p className="text-sm font-bold text-purple-600">
+                  {fortune.luckyItem}
                 </p>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">ラッキースポット</p>
-                <p className="text-xl font-bold text-blue-600">
-                  📍 {fortune.luckySpot}
+              <div className="lucky-card bg-gradient-to-br from-blue-100 to-blue-50 p-4 rounded-xl text-center border border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className="text-3xl mb-2">📍</div>
+                <p className="text-xs text-gray-500 mb-1">スポット</p>
+                <p className="text-sm font-bold text-blue-600">
+                  {fortune.luckySpot}
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 text-center text-sm text-gray-500">
+            <div className="mt-6 text-center text-xs text-gray-400">
               {new Date(fortune.timestamp).toLocaleString('ja-JP')}
             </div>
           </div>
