@@ -141,15 +141,22 @@ def invoke(payload, context=None):
         result = create_fortune_result()
         display = format_fortune_display(result)
         
-        # エージェントに結果を伝えて会話
+        # エージェントに結果を伝えて会話（Memoryに明示的に保存）
         agent_prompt = f"""
 ユーザーがおみくじを引きました。以下の結果が出ました：
+
+【今日のおみくじ結果】
+- 運勢: {result["fortune"]}
+- ラッキーカラー: {result["lucky_color"]}
+- ラッキーアイテム: {result["lucky_item"]}
+- ラッキースポット: {result["lucky_spot"]}
 
 {display}
 
 ユーザーの質問: {user_prompt}
 
-フレンドリーな口調で、おみくじ結果を伝えてください。
+フレンドリーなギャル語で、おみくじ結果を伝えてください。
+今後の会話でもこのおみくじ結果を覚えておいて、ユーザーが質問したら参照してください。
 もし過去のおみくじ履歴があれば、それも踏まえてアドバイスしてください。
 """
         agent_response = agent(agent_prompt)
@@ -179,9 +186,25 @@ Code Interpreterを使って、グラフを作成できます。
             "result": str(agent_response.message)
         }
     
-    # その他の会話
+    # その他の会話（チャット機能）
     else:
-        agent_response = agent(user_prompt)
+        # プロンプトにおみくじコンテキストが含まれているかチェック
+        if "おみくじ結果" in user_prompt or "運勢:" in user_prompt or "ラッキー" in user_prompt:
+            # おみくじコンテキスト付きチャット
+            enhanced_prompt = f"""
+{user_prompt}
+
+【重要な指示】
+- ユーザーが引いたおみくじ結果を必ず参照して回答してください
+- 運勢やラッキーアイテムについて具体的にアドバイスしてください
+- フレンドリーなギャル語で話してください
+- 過去の会話履歴がある場合は、それも考慮してください
+"""
+            agent_response = agent(enhanced_prompt)
+        else:
+            # 通常のチャット
+            agent_response = agent(user_prompt)
+        
         return {
             "result": str(agent_response.message)
         }
