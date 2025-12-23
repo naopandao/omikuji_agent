@@ -34,18 +34,13 @@ export async function POST(request: NextRequest) {
     // プロンプト作成（おみくじコンテキストを含める）
     let prompt = message;
     if (fortuneContext) {
-      prompt = `
-ユーザーが引いたおみくじの結果:
-- 運勢: ${fortuneContext.fortune}
-- ラッキーカラー: ${fortuneContext.luckyColor}
-- ラッキーアイテム: ${fortuneContext.luckyItem}
-- ラッキースポット: ${fortuneContext.luckySpot}
+      // システムメッセージ形式でコンテキストを提供
+      prompt = `【重要】今日のおみくじ結果: ${fortuneContext.fortune}（ラッキーカラー:${fortuneContext.luckyColor}、ラッキーアイテム:${fortuneContext.luckyItem}、ラッキースポット:${fortuneContext.luckySpot}）
 
-ユーザーからの質問: ${message}
-
-フレンドリーなギャル語で、おみくじ結果を踏まえて回答してください。
-過去の会話履歴があれば、それも参考にしてください。
-`;
+${message}`;
+      console.log('[Chat API] Prompt with fortune context:', prompt);
+    } else {
+      console.log('[Chat API] Prompt without fortune context:', prompt);
     }
 
     // AgentCore Runtimeを呼び出し
