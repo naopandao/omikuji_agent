@@ -3,22 +3,28 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { fetchOmikuji, saveFortuneResult, type FortuneData, type OmikujiResponse } from '@/lib/api';
+import { fetchOmikuji, saveFortuneResult, sendChatMessage, type FortuneData, type OmikujiResponse, type ChatMessage } from '@/lib/api';
 
 export default function Home() {
   const [fortune, setFortune] = useState<FortuneData | null>(null);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
 
   const drawFortune = async () => {
     setLoading(true);
     setError(null);
+    setChatMessages([]); // チャット履歴をリセット
 
     try {
       const result: OmikujiResponse = await fetchOmikuji();
       setFortune(result.fortune_data);
       setAiMessage(result.result); // AIからのメッセージを保存
+      setSessionId(result.sessionId); // セッションIDを保存
 
       // 履歴に保存
       await saveFortuneResult(result.fortune_data);
@@ -28,6 +34,45 @@ export default function Home() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || !fortune || !sessionId) return;
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: chatInput,
+      timestamp: new Date().toISOString(),
+    };
+
+    // ユーザーメッセージを追加
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      // AIにメッセージ送信
+      const response = await sendChatMessage(chatInput, sessionId, fortune);
+      
+      const aiMessage: ChatMessage = {
+        role: 'assistant',
+        content: response.message,
+        timestamp: response.timestamp,
+      };
+
+      // AIメッセージを追加
+      setChatMessages(prev => [...prev, aiMessage]);
+    } catch (err) {
+      console.error('Failed to send chat:', err);
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: 'ごめんね、今ちょっと調子悪いみたい...もう一回試してみて！💦',
+        timestamp: new Date().toISOString(),
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -186,6 +231,80 @@ export default function Home() {
 
             <div className="mt-6 text-center text-sm text-gray-500">
               {new Date(fortune.timestamp).toLocaleString('ja-JP')}
+            </div>
+          </div>
+        )}
+
+        {/* チャット機能 */}
+        {fortune && (
+          <div className="chat-section bg-white rounded-2xl shadow-xl p-6 mb-8">
+            <h3 className="text-xl font-bold text-purple-600 mb-4 flex items-center gap-2">
+              💬 AIと話してみる
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              おみくじの結果について、AIに質問してみよう！過去の会話も覚えているよ✨
+            </p>
+
+            {/* チャット履歴 */}
+            {chatMessages.length > 0 && (
+              <div className="chat-messages space-y-3 mb-4 max-h-96 overflow-y-auto">
+                {chatMessages.map((msg, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        msg.role === 'user'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      <div className="prose prose-sm max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                      <div className={`text-xs mt-1 ${
+                        msg.role === 'user' ? 'text-purple-200' : 'text-gray-500'
+                      }`}>
+                        {new Date(msg.timestamp).toLocaleTimeString('ja-JP')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* チャット入力 */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChat();
+                  }
+                }}
+                placeholder="例: この運勢で気をつけることは？"
+                disabled={chatLoading}
+                className="flex-1 px-4 py-3 border-2 border-purple-200 rounded-xl focus:outline-none focus:border-purple-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={sendChat}
+                disabled={chatLoading || !chatInput.trim()}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {chatLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="loading-spinner inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                  </span>
+                ) : (
+                  '送信'
+                )}
+              </button>
             </div>
           </div>
         )}
