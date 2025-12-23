@@ -39,5 +39,20 @@ Thumbs.db
 aws/
 awscliv2.zip
 
-# Wrangler temp files
-.wrangler/tmp/
+# Node.js (ルート - Next.jsはnextjs-app/内で管理)
+node_modules/
+package-lock.json
+
+# Cloudflare Workers (削除済み)
+.wrangler/
+wrangler.toml
+.dev.vars
+
+# Vite/Build (削除済み)
+dist/
+.cache/
+
+# Lambda (削除済み)
+lambda/
+lambda-agentcore/
+*.zip
