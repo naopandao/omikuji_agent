@@ -25,6 +25,18 @@ export interface OmikujiResponse {
   sessionId: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface ChatResponse {
+  message: string;
+  sessionId: string;
+  timestamp: string;
+}
+
 /**
  * おみくじを引く - API Route → AgentCore Runtime
  */
@@ -69,16 +81,21 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
 /**
  * AIとチャット - API Route → AgentCore Runtime
  */
-export async function sendChatMessage(message: string, sessionId?: string): Promise<string> {
+export async function sendChatMessage(
+  message: string, 
+  sessionId?: string,
+  fortuneContext?: FortuneData
+): Promise<ChatResponse> {
   try {
-    const response = await fetch('/api/omikuji', {
+    const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        prompt: message,
+        message,
         sessionId: sessionId || `chat-${Date.now()}`,
+        fortuneContext,
       }),
     });
 
@@ -86,12 +103,16 @@ export async function sendChatMessage(message: string, sessionId?: string): Prom
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.result || '';
+    const data: ChatResponse = await response.json();
+    return data;
 
   } catch (error) {
     console.error('Failed to send chat message:', error);
-    return 'ごめんね、今ちょっと調子悪いみたい...もう一回試してみて！💦';
+    return {
+      message: 'ごめんね、今ちょっと調子悪いみたい...もう一回試してみて！💦',
+      sessionId: sessionId || `chat-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
