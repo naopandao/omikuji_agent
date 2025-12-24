@@ -18,66 +18,50 @@ export async function POST(request: NextRequest) {
     requestSessionId = sessionId || requestSessionId;
 
     // 動的importでAWS SDKを読み込み（SSR互換性のため）
-    const { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } = await import('@aws-sdk/client-bedrock-agentcore');
+    const { BedrockAgentRuntimeClient, InvokeAgentCommand } = await import('@aws-sdk/client-bedrock-agent-runtime');
 
     // AWS Client作成
-    const client = new BedrockAgentCoreClient({
+    const client = new BedrockAgentRuntimeClient({
       region: AWS_REGION,
     });
 
-    // AgentCore Runtimeを呼び出し
-    const command = new InvokeAgentRuntimeCommand({
-      agentRuntimeArn: AGENT_RUNTIME_ARN,
-      payload: Buffer.from(JSON.stringify({ 
-        prompt,
-        session_id: sessionId 
-      }), 'utf-8'),
+    // Bedrock Agent を呼び出し
+    const command = new InvokeAgentCommand({
+      agentId: AGENT_RUNTIME_ARN.split('/').pop() || 'my_agent-9NBXM54pmz',
+      agentAliasId: 'TSTALIASID',
+      sessionId: requestSessionId,
+      inputText: prompt,
     });
 
     const response = await client.send(command);
 
     // ストリーミングレスポンスを読み取り
-    let resultStr = '';
-    if (response.response) {
-      const chunks: Buffer[] = [];
-      for await (const chunk of response.response as AsyncIterable<Uint8Array>) {
-        chunks.push(Buffer.from(chunk));
-      }
-      resultStr = Buffer.concat(chunks).toString('utf-8');
-    }
-
-    // JSONパース
-    let parsedResult;
-    try {
-      parsedResult = JSON.parse(resultStr);
-    } catch {
-      parsedResult = { result: resultStr };
-    }
-
-    // AgentCoreのレスポンス形式を解析
-    // parsedResult.result が文字列の場合、さらにJSONパースが必要な場合がある
     let aiMessage = '';
-    let fortuneData = parsedResult.fortune_data || null;
-
-    // result が {'role': 'assistant', 'content': [{'text': '...'}]} 形式の場合
-    if (parsedResult.result && typeof parsedResult.result === 'string') {
-      try {
-        // 文字列化されたJSONをパース
-        const resultObj = JSON.parse(parsedResult.result.replace(/'/g, '"'));
-        if (resultObj.content && Array.isArray(resultObj.content)) {
-          aiMessage = resultObj.content.map((c: { text?: string }) => c.text || '').join('\n');
-        } else {
-          aiMessage = parsedResult.result;
+    let fortuneData = null;
+    
+    if (response.completion) {
+      for await (const event of response.completion) {
+        if (event.chunk && event.chunk.bytes) {
+          const chunkText = new TextDecoder().decode(event.chunk.bytes);
+          try {
+            const parsed = JSON.parse(chunkText);
+            if (parsed.bytes) {
+              aiMessage += new TextDecoder().decode(parsed.bytes);
+            } else if (parsed.text) {
+              aiMessage += parsed.text;
+            } else if (parsed.result) {
+              aiMessage = parsed.result;
+              if (parsed.fortune_data) {
+                fortuneData = parsed.fortune_data;
+              }
+            } else {
+              aiMessage += chunkText;
+            }
+          } catch {
+            aiMessage += chunkText;
+          }
         }
-      } catch {
-        // パース失敗時はそのまま使用
-        aiMessage = parsedResult.result;
       }
-    } else if (parsedResult.result?.content) {
-      // 直接オブジェクトの場合
-      aiMessage = parsedResult.result.content.map((c: { text?: string }) => c.text || '').join('\n');
-    } else {
-      aiMessage = resultStr;
     }
 
     // fortune_data のキー名を正規化（snake_case → camelCase）
