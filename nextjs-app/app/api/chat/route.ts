@@ -61,25 +61,56 @@ export async function POST(request: NextRequest) {
 
     const response = await client.send(command);
 
-    // ストリーミングレスポンスを読み取り
+    // AgentCore Runtime のレスポンスを読み取り
+    // response.response は StreamingBlobPayloadOutputTypes（Blob/Buffer/ReadableStream）
     let aiMessage = '';
     if (response.response) {
-      for await (const event of response.response) {
-        if (event.chunk) {
-          const chunkText = new TextDecoder().decode(event.chunk);
-          try {
-            const parsed = JSON.parse(chunkText);
-            if (parsed.result) {
-              aiMessage = parsed.result;
-            } else if (parsed.text) {
-              aiMessage += parsed.text;
-            } else {
-              aiMessage += chunkText;
-            }
-          } catch {
-            aiMessage += chunkText;
-          }
+      // Node.js環境: response.response は Readable Streamの可能性
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const responseBody = response.response as any;
+      
+      // レスポンスをテキストに変換
+      let responseText = '';
+      
+      if (typeof responseBody === 'string') {
+        responseText = responseBody;
+      } else if (responseBody instanceof Uint8Array || Buffer.isBuffer(responseBody)) {
+        responseText = new TextDecoder().decode(responseBody);
+      } else if (typeof responseBody.transformToString === 'function') {
+        // AWS SDK SdkStream type
+        responseText = await responseBody.transformToString();
+      } else if (typeof responseBody.text === 'function') {
+        // Blob type
+        responseText = await responseBody.text();
+      } else if (responseBody[Symbol.asyncIterator]) {
+        // Async iterable (ReadableStream)
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of responseBody) {
+          chunks.push(chunk as Uint8Array);
         }
+        const combined = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
+        let offset = 0;
+        for (const chunk of chunks) {
+          combined.set(chunk, offset);
+          offset += chunk.length;
+        }
+        responseText = new TextDecoder().decode(combined);
+      }
+      
+      // JSONパース試行
+      try {
+        const parsed = JSON.parse(responseText);
+        if (parsed.result) {
+          aiMessage = parsed.result;
+        } else if (parsed.text) {
+          aiMessage = parsed.text;
+        } else if (parsed.message) {
+          aiMessage = parsed.message;
+        } else {
+          aiMessage = responseText;
+        }
+      } catch {
+        aiMessage = responseText;
       }
     }
 
