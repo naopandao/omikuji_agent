@@ -6,6 +6,10 @@
  * アーキテクチャ:
  * フロントエンド → /api/omikuji (Server Side) → AgentCore Runtime
  * 
+ * 重要: セッションID管理
+ * - おみくじとチャットで同じセッションIDを使用することで、
+ *   AgentCore RuntimeのMemory機能が有効になり、会話が繋がる
+ * 
  * TODO: Amplify Gen2 + AppSync への移行
  * 現在はSSR API Routeで実装、将来的にAppSync HTTP Data Sourceに移行予定
  */
@@ -38,10 +42,29 @@ export interface ChatResponse {
 }
 
 /**
- * おみくじを引く - API Route → AgentCore Runtime
+ * セッションIDを取得または生成
+ * ブラウザセッション中は同じIDを維持
  */
-export async function fetchOmikuji(): Promise<OmikujiResponse> {
-  const sessionId = `omikuji-${Date.now()}`;
+export function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') {
+    return `server-${Date.now()}`;
+  }
+  
+  const existing = sessionStorage.getItem('omikuji_session_id');
+  if (existing) return existing;
+  
+  // UUID形式で生成（AgentCore Runtimeは33文字以上推奨）
+  const newId = `user-${crypto.randomUUID()}`;
+  sessionStorage.setItem('omikuji_session_id', newId);
+  return newId;
+}
+
+/**
+ * おみくじを引く - API Route → AgentCore Runtime
+ * @param sessionId セッションID（省略時は自動生成）
+ */
+export async function fetchOmikuji(sessionId?: string): Promise<OmikujiResponse> {
+  const effectiveSessionId = sessionId || getOrCreateSessionId();
 
   try {
     const response = await fetch('/api/omikuji', {
@@ -51,7 +74,7 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
       },
       body: JSON.stringify({
         prompt: 'おみくじを引いてください',
-        sessionId,
+        sessionId: effectiveSessionId,
       }),
     });
 
@@ -68,24 +91,30 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
     return {
       result: data.result || '',
       fortune_data: data.fortune_data || getFallbackFortuneData(),
-      sessionId: data.sessionId || sessionId,
+      sessionId: data.sessionId || effectiveSessionId,
     };
 
   } catch (error) {
     console.error('Failed to fetch omikuji:', error);
     // フォールバック: モックデータを返す
-    return getFallbackOmikuji(sessionId);
+    return getFallbackOmikuji(effectiveSessionId);
   }
 }
 
 /**
  * AIとチャット - API Route → AgentCore Runtime
+ * @param message ユーザーメッセージ
+ * @param sessionId セッションID（おみくじと同じIDを渡すこと！）
+ * @param fortuneContext おみくじ結果（バックアップ用）
  */
 export async function sendChatMessage(
   message: string, 
   sessionId?: string,
   fortuneContext?: FortuneData
 ): Promise<ChatResponse> {
+  // おみくじと同じセッションIDを使用（Memory機能で会話が繋がる）
+  const effectiveSessionId = sessionId || getOrCreateSessionId();
+  
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -94,7 +123,7 @@ export async function sendChatMessage(
       },
       body: JSON.stringify({
         message,
-        sessionId: sessionId || `chat-${Date.now()}`,
+        sessionId: effectiveSessionId,
         fortuneContext,
       }),
     });
@@ -110,7 +139,7 @@ export async function sendChatMessage(
     console.error('Failed to send chat message:', error);
     return {
       message: 'ごめんね、今ちょっと調子悪いみたい...もう一回試してみて！💦',
-      sessionId: sessionId || `chat-${Date.now()}`,
+      sessionId: effectiveSessionId,
       timestamp: new Date().toISOString(),
     };
   }
