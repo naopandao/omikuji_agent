@@ -784,3 +784,119 @@ Made with 💕
 **2025.12 対応版** - Lambda不要！AgentCore Runtime + S3 Vector Store（RAG）構成
 
 **現状:** 暫定実装（Next.js API Route）で稼働中。Amplify Gen2 Backend への移行が必要。
+
+---
+
+## 🔗 セッション管理の重要性（おみくじ → チャット連携）
+
+### 問題: チャットがおみくじ結果を覚えていない
+
+AgentCore Runtime の **Memory機能** は、**同一セッションID** でのみ会話履歴を保持します。
+セッションIDが異なると、別のユーザー・別の会話として扱われます。
+
+### ❌ 現在の問題（セッションIDが毎回変わる）
+
+```typescript
+// lib/api.ts - おみくじを引く
+export async function fetchOmikuji() {
+  const sessionId = `omikuji-${Date.now()}`;  // ← 毎回新しいID生成
+  ...
+}
+
+// lib/api.ts - チャット送信
+export async function sendChatMessage(...) {
+  sessionId: sessionId || `chat-${Date.now()}`,  // ← また別のID
+  ...
+}
+```
+
+**結果:**
+```
+おみくじを引く → セッションA（omikuji-1703412345678）→ 「大吉です！」
+チャットで質問 → セッションB（chat-1703412345999）→ 「？？？何の運勢？」
+```
+
+AgentCore Runtime は セッションB では何も知らない状態になります。
+
+### ✅ 解決策: 同一セッションIDを引き継ぐ
+
+```typescript
+// page.tsx - セッションIDを一度だけ生成して保持
+const [sessionId] = useState(() => `user-${crypto.randomUUID()}`);
+
+// おみくじを引く時
+const result = await fetchOmikuji(sessionId);  // ← 同じID
+
+// チャットで質問する時
+const response = await sendChatMessage(message, sessionId);  // ← 同じID
+```
+
+**結果:**
+```
+おみくじを引く → セッションA → 「大吉です！ラッキーカラーはピンク✨」
+チャットで質問 → セッションA → 「さっきの大吉の話ね！ピンクを取り入れると...」
+```
+
+### セッションID設計ガイドライン
+
+| シナリオ | セッションID | 備考 |
+|---------|-------------|------|
+| **匿名ユーザー** | `user-${crypto.randomUUID()}` | ブラウザセッション中は維持 |
+| **認証済みユーザー** | `user-${cognitoUserId}` | Cognitoユーザーと紐付け |
+| **永続化する場合** | `user-${userId}-${date}` | 日別にセッション分離も可能 |
+
+### AgentCore Runtime の Memory 仕様
+
+- **セッションID単位** で会話履歴を保持
+- **同一セッションID** であれば、過去の会話を全て記憶
+- **異なるセッションID** は完全に分離（別人扱い）
+- セッションIDは **33文字以上** 推奨（UUID形式）
+
+### 実装例: フロントエンドでのセッション管理
+
+```typescript
+// page.tsx
+'use client';
+import { useState, useEffect } from 'react';
+
+export default function Home() {
+  // セッションIDを一度だけ生成（コンポーネントのライフサイクル中は維持）
+  const [sessionId] = useState(() => {
+    // ブラウザ環境でのみ実行
+    if (typeof window !== 'undefined') {
+      // 既存のセッションIDがあれば再利用
+      const existing = sessionStorage.getItem('omikuji_session_id');
+      if (existing) return existing;
+      
+      // 新規生成して保存
+      const newId = `user-${crypto.randomUUID()}`;
+      sessionStorage.setItem('omikuji_session_id', newId);
+      return newId;
+    }
+    return `user-${Date.now()}`;
+  });
+
+  // おみくじを引く
+  const drawFortune = async () => {
+    const result = await fetchOmikuji(sessionId);  // ← セッションID渡す
+    setFortune(result.fortune_data);
+  };
+
+  // チャットで質問
+  const sendChat = async () => {
+    const response = await sendChatMessage(
+      chatInput,
+      sessionId,  // ← 同じセッションID
+      fortune     // ← おみくじ結果も渡す（バックアップ）
+    );
+    setChatMessages(prev => [...prev, response]);
+  };
+}
+```
+
+### なぜこれが重要か
+
+1. **Memory機能の有効化**: AgentCore Runtime の会話履歴機能が正しく動作
+2. **文脈の維持**: 「さっきの運勢について...」という質問に回答可能
+3. **パーソナライズ**: ユーザーの過去のおみくじ履歴を踏まえたアドバイス
+4. **一貫した体験**: おみくじ → チャット がシームレスに繋がる

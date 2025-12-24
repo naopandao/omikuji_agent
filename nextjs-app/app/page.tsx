@@ -1,19 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { fetchOmikuji, saveFortuneResult, sendChatMessage, type FortuneData, type OmikujiResponse, type ChatMessage } from '@/lib/api';
+import { fetchOmikuji, saveFortuneResult, sendChatMessage, getOrCreateSessionId, type FortuneData, type OmikujiResponse, type ChatMessage } from '@/lib/api';
 
 export default function Home() {
   const [fortune, setFortune] = useState<FortuneData | null>(null);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  
+  // セッションIDを一度だけ生成して保持（おみくじ → チャットで同じIDを使用）
+  const [sessionId, setSessionId] = useState<string>('');
+  
+  useEffect(() => {
+    // クライアントサイドでのみセッションID生成
+    setSessionId(getOrCreateSessionId());
+  }, []);
 
   const drawFortune = async () => {
     setLoading(true);
@@ -21,10 +28,10 @@ export default function Home() {
     setChatMessages([]); // チャット履歴をリセット
 
     try {
-      const result: OmikujiResponse = await fetchOmikuji();
+      // 同じセッションIDを使用（Memory機能で会話履歴が繋がる）
+      const result: OmikujiResponse = await fetchOmikuji(sessionId);
       setFortune(result.fortune_data);
       setAiMessage(result.result); // AIからのメッセージを保存
-      setSessionId(result.sessionId); // セッションIDを保存
 
       // 履歴に保存
       await saveFortuneResult(result.fortune_data);

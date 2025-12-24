@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Bedrock Agent設定
-const AGENT_ID = process.env.AGENT_ID || 'my_agent-9NBXM54pmz';
-const AGENT_ALIAS_ID = process.env.AGENT_ALIAS_ID || 'TSTALIASID';
+// AgentCore Runtime 設定
+const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN || 
+  'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
 const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
 
 /**
  * チャットAPI - AgentCore Runtime を呼び出し
+ * 
+ * 重要: おみくじと同じセッションIDを使うことで、AgentCore RuntimeのMemory機能が有効になる
+ * 
+ * SDK: @aws-sdk/client-bedrock-agentcore
+ * API: InvokeAgentRuntimeCommand
  */
 export async function POST(request: NextRequest) {
   let requestSessionId = `chat-${Date.now()}`;
@@ -25,45 +30,47 @@ export async function POST(request: NextRequest) {
     requestSessionId = sessionId || requestSessionId;
 
     // 動的importでAWS SDKを読み込み（SSR互換性のため）
-    const { BedrockAgentRuntimeClient, InvokeAgentCommand } = await import('@aws-sdk/client-bedrock-agent-runtime');
+    const { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } = await import('@aws-sdk/client-bedrock-agentcore');
 
     // AWS Client作成
-    const client = new BedrockAgentRuntimeClient({
+    const client = new BedrockAgentCoreClient({
       region: AWS_REGION,
     });
 
-    // プロンプト作成（おみくじコンテキストを含める）
+    // プロンプト作成（おみくじコンテキストを含める - バックアップ用）
+    // ※ 同一セッションIDならAgentCore RuntimeのMemory機能で自動的に会話履歴を参照
     let prompt = message;
     if (fortuneContext) {
-      // システムメッセージ形式でコンテキストを提供
-      prompt = `【重要】今日のおみくじ結果: ${fortuneContext.fortune}（ラッキーカラー:${fortuneContext.luckyColor}、ラッキーアイテム:${fortuneContext.luckyItem}、ラッキースポット:${fortuneContext.luckySpot}）
+      prompt = `【参考情報】今日のおみくじ結果: ${fortuneContext.fortune}（ラッキーカラー:${fortuneContext.luckyColor}、ラッキーアイテム:${fortuneContext.luckyItem}、ラッキースポット:${fortuneContext.luckySpot}）
 
-${message}`;
-      console.log('[Chat API] Prompt with fortune context:', prompt);
-    } else {
-      console.log('[Chat API] Prompt without fortune context:', prompt);
+ユーザーの質問: ${message}`;
     }
 
-    // Bedrock Agent を呼び出し
-    const command = new InvokeAgentCommand({
-      agentId: AGENT_ID,
-      agentAliasId: AGENT_ALIAS_ID,
+    console.log('[Chat API] Invoking AgentCore Runtime:', {
+      arn: AGENTCORE_RUNTIME_ARN,
       sessionId: requestSessionId,
-      inputText: prompt,
+      hasFortuneContext: !!fortuneContext,
+    });
+
+    // AgentCore Runtime を呼び出し
+    const command = new InvokeAgentRuntimeCommand({
+      agentRuntimeArn: AGENTCORE_RUNTIME_ARN,
+      runtimeSessionId: requestSessionId,
+      payload: new TextEncoder().encode(JSON.stringify({ prompt })),
     });
 
     const response = await client.send(command);
 
     // ストリーミングレスポンスを読み取り
     let aiMessage = '';
-    if (response.completion) {
-      for await (const event of response.completion) {
-        if (event.chunk && event.chunk.bytes) {
-          const chunkText = new TextDecoder().decode(event.chunk.bytes);
+    if (response.response) {
+      for await (const event of response.response) {
+        if (event.chunk) {
+          const chunkText = new TextDecoder().decode(event.chunk);
           try {
             const parsed = JSON.parse(chunkText);
-            if (parsed.bytes) {
-              aiMessage += new TextDecoder().decode(parsed.bytes);
+            if (parsed.result) {
+              aiMessage = parsed.result;
             } else if (parsed.text) {
               aiMessage += parsed.text;
             } else {
@@ -80,6 +87,8 @@ ${message}`;
     if (!aiMessage || aiMessage.trim() === '') {
       aiMessage = 'ごめんね、ちょっと上手く答えられなかった💦 もう一回聞いてみて！';
     }
+
+    console.log('[Chat API] Response:', { aiMessage: aiMessage.substring(0, 100) });
 
     return NextResponse.json({
       message: aiMessage,
@@ -98,4 +107,3 @@ ${message}`;
     }, { status: 500 });
   }
 }
-

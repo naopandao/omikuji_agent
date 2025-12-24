@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Bedrock Agent設定
-const AGENT_ID = process.env.AGENT_ID || 'my_agent-9NBXM54pmz';
-const AGENT_ALIAS_ID = process.env.AGENT_ALIAS_ID || 'TSTALIASID';
+// AgentCore Runtime 設定
+const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN || 
+  'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
 const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
 
 /**
- * AgentCore Runtime を boto3形式で呼び出し
- * @aws-sdk/client-bedrock-agentcore は新しすぎてAmplify SSR環境で問題があるため、
- * 直接HTTPリクエストで呼び出す
+ * AgentCore Runtime を呼び出し（Bedrock Agentsではなく新しいAgentCore）
+ * 
+ * SDK: @aws-sdk/client-bedrock-agentcore
+ * API: InvokeAgentRuntimeCommand
  */
 export async function POST(request: NextRequest) {
   let requestSessionId = `fallback-${Date.now()}`;
@@ -19,19 +20,24 @@ export async function POST(request: NextRequest) {
     requestSessionId = sessionId || requestSessionId;
 
     // 動的importでAWS SDKを読み込み（SSR互換性のため）
-    const { BedrockAgentRuntimeClient, InvokeAgentCommand } = await import('@aws-sdk/client-bedrock-agent-runtime');
+    const { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } = await import('@aws-sdk/client-bedrock-agentcore');
 
     // AWS Client作成
-    const client = new BedrockAgentRuntimeClient({
+    const client = new BedrockAgentCoreClient({
       region: AWS_REGION,
     });
 
-    // Bedrock Agent を呼び出し
-    const command = new InvokeAgentCommand({
-      agentId: AGENT_ID,
-      agentAliasId: AGENT_ALIAS_ID,
+    // AgentCore Runtime を呼び出し
+    const command = new InvokeAgentRuntimeCommand({
+      agentRuntimeArn: AGENTCORE_RUNTIME_ARN,
+      runtimeSessionId: requestSessionId,
+      payload: new TextEncoder().encode(JSON.stringify({ prompt })),
+    });
+
+    console.log('[Omikuji API] Invoking AgentCore Runtime:', {
+      arn: AGENTCORE_RUNTIME_ARN,
       sessionId: requestSessionId,
-      inputText: prompt,
+      prompt,
     });
 
     const response = await client.send(command);
@@ -40,21 +46,19 @@ export async function POST(request: NextRequest) {
     let aiMessage = '';
     let fortuneData = null;
     
-    if (response.completion) {
-      for await (const event of response.completion) {
-        if (event.chunk && event.chunk.bytes) {
-          const chunkText = new TextDecoder().decode(event.chunk.bytes);
+    if (response.response) {
+      for await (const event of response.response) {
+        if (event.chunk) {
+          const chunkText = new TextDecoder().decode(event.chunk);
           try {
             const parsed = JSON.parse(chunkText);
-            if (parsed.bytes) {
-              aiMessage += new TextDecoder().decode(parsed.bytes);
-            } else if (parsed.text) {
-              aiMessage += parsed.text;
-            } else if (parsed.result) {
+            if (parsed.result) {
               aiMessage = parsed.result;
               if (parsed.fortune_data) {
                 fortuneData = parsed.fortune_data;
               }
+            } else if (parsed.text) {
+              aiMessage += parsed.text;
             } else {
               aiMessage += chunkText;
             }
@@ -77,6 +81,8 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    console.log('[Omikuji API] Response:', { aiMessage: aiMessage.substring(0, 100), fortuneData });
+
     // フロントエンドが期待する形式で返す
     return NextResponse.json({
       result: aiMessage,
@@ -85,7 +91,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('AgentCore invocation error:', error);
+    console.error('AgentCore Runtime invocation error:', error);
     
     // フォールバック: モックデータを返す
     return NextResponse.json({
