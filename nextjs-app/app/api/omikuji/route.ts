@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// AgentCore Runtime設定
-const AGENT_RUNTIME_ARN = process.env.AGENT_RUNTIME_ARN || 'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
-const AWS_REGION = process.env.AGENTCORE_REGION || 'ap-northeast-1';
+// Bedrock Agent設定
+const AGENT_ID = process.env.AGENT_ID || 'my_agent-9NBXM54pmz';
+const AGENT_ALIAS_ID = process.env.AGENT_ALIAS_ID || 'TSTALIASID';
+const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
 
 /**
  * AgentCore Runtime を boto3形式で呼び出し
@@ -27,8 +28,8 @@ export async function POST(request: NextRequest) {
 
     // Bedrock Agent を呼び出し
     const command = new InvokeAgentCommand({
-      agentId: AGENT_RUNTIME_ARN.split('/').pop() || 'my_agent-9NBXM54pmz',
-      agentAliasId: 'TSTALIASID',
+      agentId: AGENT_ID,
+      agentAliasId: AGENT_ALIAS_ID,
       sessionId: requestSessionId,
       inputText: prompt,
     });
