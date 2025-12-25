@@ -17,6 +17,6 @@ COPY my_agent.py .
 ENV AWS_REGION=ap-northeast-1
 ENV PYTHONUNBUFFERED=1
 
-# Run the agent
-CMD ["python", "-m", "bedrock_agentcore.server", "--entrypoint", "omikuji_agent:app"]
+# Run the agent (uses app.run() which starts uvicorn server)
+CMD ["python", "omikuji_agent.py"]
 

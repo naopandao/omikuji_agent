@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // AgentCore Runtime 設定
 const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN || 
-  'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
+  'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-ocF0JfFaVa';
 const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
 
 /**

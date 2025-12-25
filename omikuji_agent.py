@@ -1,6 +1,6 @@
 """
-AI おみくじエージェント - Step 1: 基礎版
-Memory + Code Interpreter を使った学習するおみくじ
+AI おみくじエージェント - シンプル版
+基本的なおみくじ機能 + Strands Agent
 """
 
 import os
@@ -9,7 +9,6 @@ import random
 from datetime import datetime
 from bedrock_agentcore import BedrockAgentCoreApp
 from strands import Agent
-from bedrock_agentcore.tools import AgentCoreCodeInterpreter
 
 # AgentCore アプリケーション初期化
 app = BedrockAgentCoreApp()
@@ -102,38 +101,12 @@ def format_fortune_display(result: dict) -> str:
 def invoke(payload, context=None):
     """エージェントのメインエントリーポイント"""
     
-    # Memory設定（環境変数から取得）
-    memory_id = os.environ.get("BEDROCK_AGENTCORE_MEMORY_ID")
-    aws_region = os.environ.get("AWS_REGION", "us-east-1")
-    
     # ユーザー入力取得
     user_prompt = payload.get("prompt", "おみくじを引きたい")
     session_id = payload.get("session_id", "default-session")
     
-    # Memory設定
-    session_manager = None
-    if memory_id:
-        from bedrock_agentcore.memory import AgentCoreMemorySessionManager, AgentCoreMemoryConfig
-        memory_config = AgentCoreMemoryConfig(
-            memory_id=memory_id,
-            region=aws_region
-        )
-        session_manager = AgentCoreMemorySessionManager(
-            session_id=session_id,
-            memory_config=memory_config
-        )
-    
-    # Code Interpreter ツール作成
-    code_interpreter = AgentCoreCodeInterpreter(
-        region=aws_region,
-        session_id=session_id
-    )
-    
-    # エージェント作成
-    agent = Agent(
-        tools=[code_interpreter],
-        session_manager=session_manager
-    )
+    # シンプルなエージェント作成（Memory/Code Interpreterなし）
+    agent = Agent()
     
     # おみくじを引く処理
     if "おみくじ" in user_prompt or "運勢" in user_prompt or "fortune" in user_prompt.lower():
@@ -141,7 +114,7 @@ def invoke(payload, context=None):
         result = create_fortune_result()
         display = format_fortune_display(result)
         
-        # エージェントに結果を伝えて会話（Memoryに明示的に保存）
+        # エージェントに結果を伝えて会話
         agent_prompt = f"""
 ユーザーがおみくじを引きました。以下の結果が出ました：
 
@@ -156,8 +129,6 @@ def invoke(payload, context=None):
 ユーザーの質問: {user_prompt}
 
 フレンドリーなギャル語で、おみくじ結果を伝えてください。
-今後の会話でもこのおみくじ結果を覚えておいて、ユーザーが質問したら参照してください。
-もし過去のおみくじ履歴があれば、それも踏まえてアドバイスしてください。
 """
         agent_response = agent(agent_prompt)
         
@@ -165,25 +136,6 @@ def invoke(payload, context=None):
             "result": str(agent_response.message),
             "fortune_data": result,
             "display": display
-        }
-    
-    # 統計・分析の質問
-    elif "統計" in user_prompt or "グラフ" in user_prompt or "分析" in user_prompt:
-        agent_prompt = f"""
-ユーザーからの質問: {user_prompt}
-
-過去のおみくじ履歴を分析して、統計情報を提供してください。
-Code Interpreterを使って、グラフを作成できます。
-
-例：
-- 運勢の分布
-- 大吉の出現率
-- 時系列の運勢推移
-"""
-        agent_response = agent(agent_prompt)
-        
-        return {
-            "result": str(agent_response.message)
         }
     
     # その他の会話（チャット機能）
@@ -198,7 +150,6 @@ Code Interpreterを使って、グラフを作成できます。
 - ユーザーが引いたおみくじ結果を必ず参照して回答してください
 - 運勢やラッキーアイテムについて具体的にアドバイスしてください
 - フレンドリーなギャル語で話してください
-- 過去の会話履歴がある場合は、それも考慮してください
 """
             agent_response = agent(enhanced_prompt)
         else:
