@@ -246,6 +246,156 @@ npm install
 git push origin main  # Amplify自動デプロイ
 ```
 
+## 🚀 デプロイ手順（詳細）
+
+### AgentCore Runtime 更新デプロイ
+
+`omikuji_agent.py` を変更した場合の再デプロイ手順です。
+
+#### Step 1: ソースコードをZIP化してS3にアップロード
+
+```bash
+# 必要ファイルをZIP化
+cd /path/to/project
+zip -r source.zip Dockerfile requirements.txt omikuji_agent.py my_agent.py
+
+# S3にアップロード（CodeBuildのソース）
+aws s3 cp source.zip s3://bedrock-agentcore-codebuild-sources-<ACCOUNT_ID>-ap-northeast-1/my_agent/source.zip
+```
+
+#### Step 2: CodeBuild でARM64コンテナをビルド
+
+```bash
+# CodeBuildプロジェクトを実行
+aws codebuild start-build --project-name bedrock-agentcore-my_agent-builder
+
+# ビルド状況を確認
+aws codebuild batch-get-builds --ids <BUILD_ID> --query 'builds[0].{status:buildStatus,phase:currentPhase}'
+```
+
+**⚠️ 注意: Docker Hub Rate Limit**
+
+Docker Hub の pull rate limit に引っかかる場合は、Dockerfile のベースイメージを ECR Public に変更してください：
+
+```dockerfile
+# NG: Docker Hub（rate limitあり）
+FROM --platform=linux/arm64 python:3.11-slim
+
+# OK: ECR Public（rate limitなし）
+FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.11-slim
+```
+
+#### Step 3: AgentCore Runtime を更新
+
+```bash
+# 最新イメージでRuntimeを更新
+aws bedrock-agentcore-control update-agent-runtime \
+  --agent-runtime-id omikuji_agent-JkUdnzGA2D \
+  --agent-runtime-artifact containerConfiguration={containerUri=<ACCOUNT_ID>.dkr.ecr.ap-northeast-1.amazonaws.com/bedrock-agentcore-my_agent:latest} \
+  --network-configuration networkMode=PUBLIC
+
+# 更新状況を確認
+aws bedrock-agentcore-control get-agent-runtime \
+  --agent-runtime-id omikuji_agent-JkUdnzGA2D \
+  --query '{status:status,version:agentRuntimeVersion}'
+```
+
+ステータスが `READY` になるまで待ちます（約1-2分）。
+
+#### Step 4: 動作確認
+
+```bash
+# テスト呼び出し（base64エンコードが必要）
+PAYLOAD=$(echo '{"prompt": "test", "session_id": "test-session-12345678901234567890123456", "actor_id": "test_user", "action": "draw"}' | base64 -w 0)
+
+aws bedrock-agentcore invoke-agent-runtime \
+  --agent-runtime-arn arn:aws:bedrock-agentcore:ap-northeast-1:<ACCOUNT_ID>:runtime/omikuji_agent-JkUdnzGA2D \
+  --runtime-session-id "test-session-12345678901234567890123456" \
+  --payload "$PAYLOAD" \
+  /tmp/response.json
+
+cat /tmp/response.json
+```
+
+### フロントエンド（Amplify）デプロイ
+
+Next.js フロントエンドは GitHub へのプッシュで自動デプロイされます。
+
+```bash
+# 変更をコミット
+git add -A
+git commit -m "feat: your changes"
+
+# mainにプッシュ（Amplify自動デプロイ）
+git push origin main
+
+# デプロイ状況を確認
+aws amplify list-jobs --app-id d41aq4729k4l7 --branch-name main --max-items 1
+```
+
+### デプロイ確認チェックリスト
+
+| 確認項目 | コマンド |
+|---------|---------|
+| CodeBuild ステータス | `aws codebuild batch-get-builds --ids <BUILD_ID> --query 'builds[0].buildStatus'` |
+| ECR イメージ確認 | `aws ecr describe-images --repository-name bedrock-agentcore-my_agent --query 'imageDetails[0].imageTags'` |
+| Runtime ステータス | `aws bedrock-agentcore-control get-agent-runtime --agent-runtime-id omikuji_agent-JkUdnzGA2D --query 'status'` |
+| Amplify デプロイ | `aws amplify list-jobs --app-id d41aq4729k4l7 --branch-name main --max-items 1 --query 'jobSummaries[0].status'` |
+| CloudWatch ログ | `aws logs filter-log-events --log-group-name /aws/bedrock-agentcore/runtime/omikuji_agent-JkUdnzGA2D --limit 10` |
+
+### トラブルシューティング
+
+#### セッションIDエラー
+
+```
+ValidationException: Value at 'runtimeSessionId' failed to satisfy constraint: 
+Member must have length greater than or equal to 33
+```
+
+**原因**: セッションIDが33文字未満
+
+**解決**: `lib/api.ts` の `generateNewSessionId()` で36文字以上のIDを生成するように修正
+
+```typescript
+// 36文字のセッションID生成
+export function generateNewSessionId(): string {
+  const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+  const uuid = crypto.randomUUID();
+  const randomParts = uuid.split('-').slice(0, 2).join('-');
+  return `omikuji-${timestamp}-${randomParts}`;
+}
+```
+
+#### Docker Hub Rate Limit
+
+```
+error pulling image: 429 Too Many Requests
+```
+
+**原因**: Docker Hub の anonymous pull 制限
+
+**解決**: Dockerfile で ECR Public イメージを使用
+
+```dockerfile
+FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.11-slim
+```
+
+#### AgentCore Runtime 更新エラー
+
+```
+Unknown parameter 'containerUri' in agentRuntimeArtifact
+```
+
+**解決**: 正しいパラメータ形式を使用
+
+```bash
+# NG
+--agent-runtime-artifact containerUri=xxx
+
+# OK
+--agent-runtime-artifact containerConfiguration={containerUri=xxx}
+```
+
 ## 環境変数
 
 ### AgentCore Runtime（omikuji_agent.py）
@@ -279,8 +429,8 @@ git push origin main  # Amplify自動デプロイ
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  【session_id 形式】                                                    │
-│  omikuji-{timestamp}-{random}                                          │
-│  例: omikuji-20251225143052-a1b2c3d4e5f6                               │
+│  omikuji-{timestamp}-{uuid8}-{uuid4}  (36文字以上必須)                 │
+│  例: omikuji-20251225143052-a1b2c3d4-e5f6                              │
 │                                                                         │
 │  【AgentCore Memory】                                                   │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
@@ -312,17 +462,16 @@ git push origin main  # Amplify自動デプロイ
 - [x] Amplify Hosting デプロイ
 - [x] おみくじ機能稼働
 - [x] チャット機能稼働
-
-### 🚧 進行中
-
-- [ ] **Strands + AgentCore Memory 統合**
+- [x] **Strands + AgentCore Memory 統合** ✨
   - AgentCoreMemorySessionManager 実装
-  - セッション管理の修正
+  - セッション管理の修正（36文字以上のセッションID）
+  - おみくじ/チャット分離（action パラメータ）
 
 ### 📋 TODO
 
 - [ ] Code Interpreter 統合（統計・グラフ生成）
 - [ ] Long-Term Memory (LTM) 対応
+- [ ] actor_id のユーザー個別化（現在は全ユーザー共通）
 - [ ] Cognito 認証連携
 - [ ] CloudWatch GenAI Dashboard 設定
 
