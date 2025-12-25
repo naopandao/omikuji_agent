@@ -1,10 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { fetchOmikuji, saveFortuneResult, sendChatMessage, getOrCreateSessionId, type FortuneData, type OmikujiResponse, type ChatMessage } from '@/lib/api';
+import { 
+  fetchOmikuji, 
+  saveFortuneResult, 
+  sendChatMessage, 
+  getCurrentSessionId,
+  type FortuneData, 
+  type OmikujiResponse, 
+  type ChatMessage 
+} from '@/lib/api';
 
+/**
+ * おみくじアプリのメインページ
+ * 
+ * セッション管理設計:
+ * - おみくじを引く → 新しい session_id を発行
+ * - チャットする → 同じ session_id を使用（おみくじ結果を参照）
+ * - 再度おみくじ → 新しい session_id を発行（新しい会話開始）
+ */
 export default function Home() {
   const [fortune, setFortune] = useState<FortuneData | null>(null);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
@@ -14,27 +30,30 @@ export default function Home() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   
-  // セッションIDを一度だけ生成して保持（おみくじ → チャットで同じIDを使用）
-  const [sessionId, setSessionId] = useState<string>('');
-  
-  useEffect(() => {
-    // クライアントサイドでのみセッションID生成
-    setSessionId(getOrCreateSessionId());
-  }, []);
+  // 現在のセッションID（おみくじを引くと新しいIDが発行される）
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
+  /**
+   * おみくじを引く
+   * 毎回新しいセッションIDが発行される
+   */
   const drawFortune = async () => {
     setLoading(true);
     setError(null);
-    setChatMessages([]); // チャット履歴をリセット
+    setChatMessages([]); // チャット履歴をリセット（新しいおみくじ = 新しい会話）
 
     try {
-      // 同じセッションIDを使用（Memory機能で会話履歴が繋がる）
-      const result: OmikujiResponse = await fetchOmikuji(sessionId);
+      // fetchOmikuji() が新しいセッションIDを発行・保存する
+      const result: OmikujiResponse = await fetchOmikuji();
+      
       setFortune(result.fortune_data);
-      setAiMessage(result.result); // AIからのメッセージを保存
+      setAiMessage(result.result);
+      setCurrentSessionId(result.sessionId);
 
-      // 履歴に保存
+      // ローカル履歴に保存
       await saveFortuneResult(result.fortune_data);
+      
+      console.log('[Page] New omikuji session:', result.sessionId);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'おみくじの取得に失敗しました'
@@ -44,8 +63,18 @@ export default function Home() {
     }
   };
 
+  /**
+   * チャットを送信
+   * 現在のおみくじセッションIDを使用
+   */
   const sendChat = async () => {
-    if (!chatInput.trim() || !fortune || !sessionId) return;
+    if (!chatInput.trim() || !fortune) return;
+    
+    // セッションIDを確認
+    const sessionId = currentSessionId || getCurrentSessionId();
+    if (!sessionId) {
+      console.warn('[Page] No session ID available for chat');
+    }
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -59,17 +88,19 @@ export default function Home() {
     setChatLoading(true);
 
     try {
-      // AIにメッセージ送信
-      const response = await sendChatMessage(chatInput, sessionId, fortune);
+      // AIにメッセージ送信（同じセッションIDを使用）
+      const response = await sendChatMessage(chatInput, fortune);
       
-      const aiMessage: ChatMessage = {
+      const aiResponse: ChatMessage = {
         role: 'assistant',
         content: response.message,
         timestamp: response.timestamp,
       };
 
       // AIメッセージを追加
-      setChatMessages(prev => [...prev, aiMessage]);
+      setChatMessages(prev => [...prev, aiResponse]);
+      
+      console.log('[Page] Chat response received, session:', response.sessionId);
     } catch (err) {
       console.error('Failed to send chat:', err);
       const errorMessage: ChatMessage = {
@@ -249,7 +280,7 @@ export default function Home() {
               💬 AIと話してみる
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              おみくじの結果について、AIに質問してみよう！過去の会話も覚えているよ✨
+              おみくじの結果について、AIに質問してみよう！このおみくじの結果を覚えているよ✨
             </p>
 
             {/* チャット履歴 */}
@@ -320,7 +351,7 @@ export default function Home() {
         <div className="text-center text-sm text-gray-500 mt-12">
           <p>おみくじエージェント 💕</p>
           <p className="mt-1">
-            Next.js + TypeScript
+            Powered by Strands Agents + AgentCore Memory
           </p>
         </div>
       </div>

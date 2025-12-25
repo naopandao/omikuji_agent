@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { message, sessionId, fortuneContext } = body;
+    const { message, sessionId, actorId = 'web_user', fortuneContext } = body;
     
     if (!message) {
       return NextResponse.json(
@@ -37,18 +37,28 @@ export async function POST(request: NextRequest) {
       region: AWS_REGION,
     });
 
-    // プロンプト作成（おみくじコンテキストを含める - バックアップ用）
-    // ※ 同一セッションIDならAgentCore RuntimeのMemory機能で自動的に会話履歴を参照
+    // プロンプト作成（おみくじコンテキストを明確に含める）
     let prompt = message;
     if (fortuneContext) {
-      prompt = `【参考情報】今日のおみくじ結果: ${fortuneContext.fortune}（ラッキーカラー:${fortuneContext.luckyColor}、ラッキーアイテム:${fortuneContext.luckyItem}、ラッキースポット:${fortuneContext.luckySpot}）
+      prompt = `【重要：今回のおみくじ結果（これが最新で唯一の結果です）】
+運勢: ${fortuneContext.fortune}
+ラッキーカラー: ${fortuneContext.luckyColor}
+ラッキーアイテム: ${fortuneContext.luckyItem}
+ラッキースポット: ${fortuneContext.luckySpot}
 
-ユーザーの質問: ${message}`;
+【ユーザーの質問】
+${message}
+
+【指示】
+- 上記のおみくじ結果のみを参照して回答してください
+- 過去の会話や他のおみくじ結果は無視してください
+- フレンドリーなギャル語で、短く楽しく答えてね✨`;
     }
 
     console.log('[Chat API] Invoking AgentCore Runtime:', {
       arn: AGENTCORE_RUNTIME_ARN,
       sessionId: requestSessionId,
+      actorId,
       hasFortuneContext: !!fortuneContext,
     });
 
@@ -56,7 +66,11 @@ export async function POST(request: NextRequest) {
     const command = new InvokeAgentRuntimeCommand({
       agentRuntimeArn: AGENTCORE_RUNTIME_ARN,
       runtimeSessionId: requestSessionId,
-      payload: new TextEncoder().encode(JSON.stringify({ prompt })),
+      payload: new TextEncoder().encode(JSON.stringify({ 
+        prompt,
+        session_id: requestSessionId,
+        actor_id: actorId
+      })),
     });
 
     const response = await client.send(command);
