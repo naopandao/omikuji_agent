@@ -6,12 +6,12 @@
  * アーキテクチャ:
  * フロントエンド → /api/omikuji (Server Side) → AgentCore Runtime
  * 
- * 重要: セッションID管理
- * - おみくじとチャットで同じセッションIDを使用することで、
- *   AgentCore RuntimeのMemory機能が有効になり、会話が繋がる
+ * セッション管理設計:
+ * - おみくじを引く → 新しい session_id を発行
+ * - チャットする → 同じ session_id を使用
+ * - 再度おみくじ → 新しい session_id を発行（新しい会話開始）
  * 
- * TODO: Amplify Gen2 + AppSync への移行
- * 現在はSSR API Routeで実装、将来的にAppSync HTTP Data Sourceに移行予定
+ * つまり: おみくじID = session_id = チャットID
  */
 
 export interface FortuneData {
@@ -42,30 +42,55 @@ export interface ChatResponse {
 }
 
 /**
- * セッションIDを取得または生成
- * ブラウザセッション中は同じIDを維持
+ * 新しいセッションIDを生成
+ * おみくじを引くたびに呼び出す
+ * 
+ * 形式: omikuji-{timestamp}-{random}
+ * 例: omikuji-20251225143052-a1b2c3d4e5f6
  */
-export function getOrCreateSessionId(): string {
-  if (typeof window === 'undefined') {
-    return `server-${Date.now()}`;
-  }
-  
-  const existing = sessionStorage.getItem('omikuji_session_id');
-  if (existing) return existing;
-  
-  // UUID形式で生成（AgentCore Runtimeは33文字以上推奨）
-  const newId = `user-${crypto.randomUUID()}`;
-  sessionStorage.setItem('omikuji_session_id', newId);
-  return newId;
+export function generateNewSessionId(): string {
+  const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+  const random = crypto.randomUUID().split('-')[0];
+  return `omikuji-${timestamp}-${random}`;
+}
+
+/**
+ * 現在のセッションIDを取得
+ * sessionStorageに保存されているIDを返す
+ */
+export function getCurrentSessionId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem('current_omikuji_session_id');
+}
+
+/**
+ * セッションIDを保存
+ * おみくじを引いた後に呼び出す
+ */
+export function saveSessionId(sessionId: string): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem('current_omikuji_session_id', sessionId);
+}
+
+/**
+ * セッションをクリア
+ * 新しいおみくじを引く前に呼び出す
+ */
+export function clearSession(): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem('current_omikuji_session_id');
 }
 
 /**
  * おみくじを引く - API Route → AgentCore Runtime
- * @param sessionId セッションID（省略時は自動生成）
+ * 
+ * 重要: 毎回新しいセッションIDを発行する
+ * これにより、おみくじごとに独立した会話セッションが作られる
  */
-export async function fetchOmikuji(sessionId?: string): Promise<OmikujiResponse> {
-  const effectiveSessionId = sessionId || getOrCreateSessionId();
-
+export async function fetchOmikuji(): Promise<OmikujiResponse> {
+  // 新しいセッションIDを発行（おみくじごとに独立したセッション）
+  const newSessionId = generateNewSessionId();
+  
   try {
     const response = await fetch('/api/omikuji', {
       method: 'POST',
@@ -74,7 +99,8 @@ export async function fetchOmikuji(sessionId?: string): Promise<OmikujiResponse>
       },
       body: JSON.stringify({
         prompt: 'おみくじを引いてください',
-        sessionId: effectiveSessionId,
+        sessionId: newSessionId,
+        actorId: 'web_user',  // ユーザー識別子
       }),
     });
 
@@ -88,32 +114,45 @@ export async function fetchOmikuji(sessionId?: string): Promise<OmikujiResponse>
       throw new Error(data.error);
     }
 
+    // セッションIDを保存（チャットで使用）
+    const effectiveSessionId = data.sessionId || newSessionId;
+    saveSessionId(effectiveSessionId);
+
     return {
       result: data.result || '',
       fortune_data: data.fortune_data || getFallbackFortuneData(),
-      sessionId: data.sessionId || effectiveSessionId,
+      sessionId: effectiveSessionId,
     };
 
   } catch (error) {
     console.error('Failed to fetch omikuji:', error);
     // フォールバック: モックデータを返す
-    return getFallbackOmikuji(effectiveSessionId);
+    saveSessionId(newSessionId);
+    return getFallbackOmikuji(newSessionId);
   }
 }
 
 /**
  * AIとチャット - API Route → AgentCore Runtime
+ * 
+ * 重要: おみくじで発行されたセッションIDを使用する
+ * これにより、AgentCore Memoryがおみくじ結果を参照できる
+ * 
  * @param message ユーザーメッセージ
- * @param sessionId セッションID（おみくじと同じIDを渡すこと！）
  * @param fortuneContext おみくじ結果（バックアップ用）
  */
 export async function sendChatMessage(
   message: string, 
-  sessionId?: string,
   fortuneContext?: FortuneData
 ): Promise<ChatResponse> {
-  // おみくじと同じセッションIDを使用（Memory機能で会話が繋がる）
-  const effectiveSessionId = sessionId || getOrCreateSessionId();
+  // 現在のセッションIDを取得（おみくじで発行されたもの）
+  const sessionId = getCurrentSessionId();
+  
+  if (!sessionId) {
+    console.warn('No session ID found. Chat may not be linked to omikuji result.');
+  }
+  
+  const effectiveSessionId = sessionId || generateNewSessionId();
   
   try {
     const response = await fetch('/api/chat', {
@@ -124,7 +163,8 @@ export async function sendChatMessage(
       body: JSON.stringify({
         message,
         sessionId: effectiveSessionId,
-        fortuneContext,
+        actorId: 'web_user',
+        fortuneContext,  // バックアップ用（Memory が使えない場合）
       }),
     });
 

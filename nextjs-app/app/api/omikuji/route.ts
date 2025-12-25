@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { prompt = 'おみくじを引いてください', sessionId } = body;
+    const { prompt = 'おみくじを引いてください', sessionId, actorId = 'web_user' } = body;
     requestSessionId = sessionId || requestSessionId;
 
     // 動的importでAWS SDKを読み込み（SSR互換性のため）
@@ -31,13 +31,18 @@ export async function POST(request: NextRequest) {
     const command = new InvokeAgentRuntimeCommand({
       agentRuntimeArn: AGENTCORE_RUNTIME_ARN,
       runtimeSessionId: requestSessionId,
-      payload: new TextEncoder().encode(JSON.stringify({ prompt })),
+      payload: new TextEncoder().encode(JSON.stringify({ 
+        prompt,
+        session_id: requestSessionId,
+        actor_id: actorId
+      })),
     });
 
     console.log('[Omikuji API] Invoking AgentCore Runtime:', {
       arn: AGENTCORE_RUNTIME_ARN,
       sessionId: requestSessionId,
-      prompt,
+      actorId,
+      prompt: prompt.substring(0, 50),
     });
 
     const response = await client.send(command);
