@@ -82,15 +82,37 @@ export async function POST(request: NextRequest) {
       // JSONパース試行
       try {
         const parsed = JSON.parse(responseText);
-        if (parsed.result) {
-          aiMessage = parsed.result;
-          if (parsed.fortune_data) {
-            fortuneData = parsed.fortune_data;
+        let result = parsed.result || parsed.text || parsed.message || responseText;
+        
+        if (parsed.fortune_data) {
+          fortuneData = parsed.fortune_data;
+        }
+        
+        // result が文字列の場合、内部のJSONをさらにパース
+        if (typeof result === 'string') {
+          try {
+            // {'role': 'assistant', 'content': [{'text': '...'}]} 形式を処理
+            const jsonStr = result.replace(/'/g, '"');
+            const innerParsed = JSON.parse(jsonStr);
+            
+            if (innerParsed.content && Array.isArray(innerParsed.content)) {
+              const textContent = innerParsed.content
+                .filter((c: { text?: string }) => c.text)
+                .map((c: { text: string }) => c.text)
+                .join('\n');
+              if (textContent) {
+                aiMessage = textContent;
+              } else {
+                aiMessage = result;
+              }
+            } else if (innerParsed.text) {
+              aiMessage = innerParsed.text;
+            } else {
+              aiMessage = result;
+            }
+          } catch {
+            aiMessage = result;
           }
-        } else if (parsed.text) {
-          aiMessage = parsed.text;
-        } else if (parsed.message) {
-          aiMessage = parsed.message;
         } else {
           aiMessage = responseText;
         }

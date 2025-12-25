@@ -100,12 +100,36 @@ export async function POST(request: NextRequest) {
       // JSONパース試行
       try {
         const parsed = JSON.parse(responseText);
-        if (parsed.result) {
-          aiMessage = parsed.result;
-        } else if (parsed.text) {
-          aiMessage = parsed.text;
-        } else if (parsed.message) {
-          aiMessage = parsed.message;
+        let result = parsed.result || parsed.text || parsed.message || responseText;
+        
+        // result が文字列の場合、内部のJSONをさらにパース
+        if (typeof result === 'string') {
+          try {
+            // {'role': 'assistant', 'content': [{'text': '...'}]} 形式を処理
+            // Python の repr 形式を JSON に変換
+            const jsonStr = result.replace(/'/g, '"');
+            const innerParsed = JSON.parse(jsonStr);
+            
+            if (innerParsed.content && Array.isArray(innerParsed.content)) {
+              // content 配列から text を抽出
+              const textContent = innerParsed.content
+                .filter((c: { text?: string }) => c.text)
+                .map((c: { text: string }) => c.text)
+                .join('\n');
+              if (textContent) {
+                aiMessage = textContent;
+              } else {
+                aiMessage = result;
+              }
+            } else if (innerParsed.text) {
+              aiMessage = innerParsed.text;
+            } else {
+              aiMessage = result;
+            }
+          } catch {
+            // 内部パースに失敗した場合はそのまま使用
+            aiMessage = result;
+          }
         } else {
           aiMessage = responseText;
         }

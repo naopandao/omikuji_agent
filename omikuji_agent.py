@@ -97,6 +97,29 @@ def format_fortune_display(result: dict) -> str:
 """
     return display
 
+def extract_text_from_response(response) -> str:
+    """Strands Agentのレスポンスからテキストを抽出"""
+    # response.message は {'role': 'assistant', 'content': [{'text': '...'}]} 形式
+    message = response.message
+    
+    # 辞書の場合
+    if isinstance(message, dict):
+        content = message.get('content', [])
+        if isinstance(content, list):
+            texts = []
+            for item in content:
+                if isinstance(item, dict) and 'text' in item:
+                    texts.append(item['text'])
+            if texts:
+                return '\n'.join(texts)
+        # contentがない場合、textを直接探す
+        if 'text' in message:
+            return message['text']
+    
+    # 文字列の場合はそのまま返す
+    return str(message)
+
+
 @app.entrypoint
 def invoke(payload, context=None):
     """エージェントのメインエントリーポイント"""
@@ -112,7 +135,7 @@ def invoke(payload, context=None):
     if "おみくじ" in user_prompt or "運勢" in user_prompt or "fortune" in user_prompt.lower():
         # おみくじ結果生成
         result = create_fortune_result()
-        display = format_fortune_display(result)
+        result["stars"] = "★" * result["score"] + "☆" * (5 - result["score"])
         
         # エージェントに結果を伝えて会話
         agent_prompt = f"""
@@ -124,40 +147,35 @@ def invoke(payload, context=None):
 - ラッキーアイテム: {result["lucky_item"]}
 - ラッキースポット: {result["lucky_spot"]}
 
-{display}
-
 ユーザーの質問: {user_prompt}
 
 フレンドリーなギャル語で、おみくじ結果を伝えてください。
+短めに、でも楽しく！絵文字も使ってね✨
 """
         agent_response = agent(agent_prompt)
+        ai_text = extract_text_from_response(agent_response)
         
         return {
-            "result": str(agent_response.message),
+            "result": ai_text,
             "fortune_data": result,
-            "display": display
         }
     
     # その他の会話（チャット機能）
     else:
         # プロンプトにおみくじコンテキストが含まれているかチェック
-        if "おみくじ結果" in user_prompt or "運勢:" in user_prompt or "ラッキー" in user_prompt:
-            # おみくじコンテキスト付きチャット
-            enhanced_prompt = f"""
+        enhanced_prompt = f"""
 {user_prompt}
 
 【重要な指示】
-- ユーザーが引いたおみくじ結果を必ず参照して回答してください
-- 運勢やラッキーアイテムについて具体的にアドバイスしてください
 - フレンドリーなギャル語で話してください
+- 短めに、でも楽しく！
+- 絵文字を使ってね✨
 """
-            agent_response = agent(enhanced_prompt)
-        else:
-            # 通常のチャット
-            agent_response = agent(user_prompt)
+        agent_response = agent(enhanced_prompt)
+        ai_text = extract_text_from_response(agent_response)
         
         return {
-            "result": str(agent_response.message)
+            "result": ai_text
         }
 
 if __name__ == "__main__":
