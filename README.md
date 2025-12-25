@@ -165,13 +165,29 @@ response = agent("おみくじを引いて！")
 
 ### インフラストラクチャ
 
-| 技術 | 用途 |
-|------|------|
-| AWS Amplify Hosting | ホスティング・CI/CD |
-| Amazon ECR | コンテナレジストリ |
-| AWS CodeBuild | ARM64コンテナビルド |
-| AgentCore Memory | 会話履歴 (STM) |
-| CloudWatch Logs | ログ監視 |
+| 技術 | 用途 | IaC |
+|------|------|-----|
+| AWS Amplify Hosting | ホスティング・CI/CD | Amplify Console |
+| Amazon ECR | コンテナレジストリ | - |
+| AWS CodeBuild | ARM64コンテナビルド | **CloudFormation** ✅ |
+| AgentCore Memory | 会話履歴 (STM) | - |
+| CloudWatch Logs | ログ監視 | - |
+
+### インフラコード (IaC)
+
+```
+infra/
+├── codebuild.yml           # CodeBuild プロジェクト定義
+│   ├── GitHub 連携設定
+│   ├── ARM64 ビルド環境
+│   └── ECR プッシュ設定
+│
+└── deploy-codebuild.sh     # デプロイスクリプト
+    ├── create  - スタック作成
+    ├── update  - スタック更新
+    ├── delete  - スタック削除
+    └── status  - ステータス確認
+```
 
 ### CI/CD パイプライン
 
@@ -218,6 +234,10 @@ omikuji-agent/
 │   ├── AgentCoreMemorySessionManager 統合
 │   └── おみくじ生成ロジック
 │
+├── infra/                        # インフラコード (IaC) ⭐
+│   ├── codebuild.yml             # CodeBuild CloudFormation テンプレート
+│   └── deploy-codebuild.sh       # デプロイスクリプト
+│
 └── nextjs-app/                   # Amplify Hosting フロントエンド
     ├── app/
     │   ├── api/
@@ -240,6 +260,21 @@ omikuji-agent/
 - Node.js 18+
 - Python 3.11+
 - Docker（ARM64ビルド用）
+- GitHub OAuth 連携設定済み（CodeBuild用）
+
+### Step 0: インフラストラクチャのデプロイ（初回のみ）
+
+CodeBuild プロジェクトを CloudFormation でデプロイします。
+
+```bash
+# CloudFormation スタックをデプロイ
+./infra/deploy-codebuild.sh create
+
+# ステータス確認
+./infra/deploy-codebuild.sh status
+```
+
+**注意**: 既存の CodeBuild プロジェクトがある場合は `update` を使用してください。
 
 ### Step 1: AgentCore Memory 作成（初回のみ）
 

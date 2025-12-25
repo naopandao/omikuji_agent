@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  CodeBuild project for building AgentCore Runtime container
+  Source: GitHub repository (naopandao/omikuji_agent)
+  Target: ECR repository for ARM64 container
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: bedrock-agentcore-my_agent-builder
+    Description: CodeBuild project name
+
+  GitHubRepository:
+    Type: String
+    Default: https://github.com/naopandao/omikuji_agent.git
+    Description: GitHub repository URL
+
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: GitHub branch to build from
+
+  ECRRepositoryName:
+    Type: String
+    Default: bedrock-agentcore-my_agent
+    Description: ECR repository name for container images
+
+  CodeBuildServiceRoleArn:
+    Type: String
+    Default: arn:aws:iam::226484346947:role/AmazonBedrockAgentCoreSDKCodeBuild-ap-northeast-1-e72c1a7c7a
+    Description: IAM role ARN for CodeBuild
+
+Resources:
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ProjectName
+      Description: Build ARM64 container for AgentCore Runtime from GitHub
+      ServiceRole: !Ref CodeBuildServiceRoleArn
+      
+      # GitHub Source Configuration
+      Source:
+        Type: GITHUB
+        Location: !Ref GitHubRepository
+        GitCloneDepth: 1
+        BuildSpec: buildspec.yml
+        Auth:
+          Type: OAUTH
+        ReportBuildStatus: false
+      
+      SourceVersion: !Ref GitHubBranch
+      
+      # ARM64 Build Environment
+      Environment:
+        Type: ARM_CONTAINER
+        Image: aws/codebuild/amazonlinux2-aarch64-standard:3.0
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        PrivilegedMode: true  # Required for Docker builds
+        ImagePullCredentialsType: CODEBUILD
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: ECR_REPOSITORY_NAME
+            Value: !Ref ECRRepositoryName
+      
+      # No artifacts (push directly to ECR)
+      Artifacts:
+        Type: NO_ARTIFACTS
+      
+      # Build timeout
+      TimeoutInMinutes: 60
+      QueuedTimeoutInMinutes: 480
+      
+      # Logging
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Sub /aws/codebuild/${ProjectName}
+      
+      Tags:
+        - Key: Project
+          Value: omikuji-agent
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  CodeBuildProjectName:
+    Description: CodeBuild project name
+    Value: !Ref CodeBuildProject
+    Export:
+      Name: !Sub ${AWS::StackName}-ProjectName
+
+  CodeBuildProjectArn:
+    Description: CodeBuild project ARN
+    Value: !GetAtt CodeBuildProject.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ProjectArn
+
+  BuildCommand:
+    Description: Command to start a build
+    Value: !Sub aws codebuild start-build --project-name ${ProjectName}
