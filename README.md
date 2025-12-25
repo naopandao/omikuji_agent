@@ -165,13 +165,13 @@ response = agent("おみくじを引いて！")
 
 ### インフラストラクチャ
 
-| 技術 | 用途 |
-|------|------|
-| AWS Amplify Hosting | ホスティング・CI/CD |
-| Amazon ECR | コンテナレジストリ |
-| AWS CodeBuild | ARM64コンテナビルド |
-| AgentCore Memory | 会話履歴 (STM) |
-| CloudWatch Logs | ログ監視 |
+| 技術 | 用途 | IaC |
+|------|------|-----|
+| AWS Amplify Hosting | ホスティング・CI/CD | Amplify Console |
+| Amazon ECR | コンテナレジストリ | - |
+| AWS CodeBuild | ARM64コンテナビルド | **AWS CDK** ✅ |
+| AgentCore Memory | 会話履歴 (STM) | - |
+| CloudWatch Logs | ログ監視 | **AWS CDK** ✅ |
 
 ### CI/CD パイプライン
 
@@ -204,6 +204,28 @@ response = agent("おみくじを引いて！")
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### インフラコード (AWS CDK)
+
+```
+infra/                            # CDK プロジェクト
+├── bin/
+│   └── infra.ts                  # CDK アプリケーションエントリポイント
+├── lib/
+│   └── infra-stack.ts            # CodeBuild スタック定義
+├── package.json
+├── tsconfig.json
+└── cdk.json
+```
+
+**デプロイコマンド:**
+```bash
+cd infra
+npm install
+npx cdk deploy        # スタックをデプロイ
+npx cdk diff          # 差分を確認
+npx cdk destroy       # スタックを削除
+```
+
 ## プロジェクト構成
 
 ```
@@ -217,6 +239,10 @@ omikuji-agent/
 │   ├── Strands Agent 初期化
 │   ├── AgentCoreMemorySessionManager 統合
 │   └── おみくじ生成ロジック
+│
+├── infra/                        # AWS CDK インフラコード ⭐
+│   ├── bin/infra.ts              # CDK エントリポイント
+│   └── lib/infra-stack.ts        # CodeBuild スタック
 │
 └── nextjs-app/                   # Amplify Hosting フロントエンド
     ├── app/
@@ -240,6 +266,23 @@ omikuji-agent/
 - Node.js 18+
 - Python 3.11+
 - Docker（ARM64ビルド用）
+- AWS CDK CLI (`npm install -g aws-cdk`)
+- GitHub OAuth 連携設定済み（CodeBuild用）
+
+### Step 0: インフラストラクチャのデプロイ（初回のみ）
+
+CodeBuild プロジェクトを AWS CDK でデプロイします。
+
+```bash
+cd infra
+npm install
+
+# CDK Bootstrap（初回のみ）
+npx cdk bootstrap
+
+# スタックをデプロイ
+npx cdk deploy
+```
 
 ### Step 1: AgentCore Memory 作成（初回のみ）
 
