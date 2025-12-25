@@ -46,12 +46,16 @@ export interface ChatResponse {
  * おみくじを引くたびに呼び出す
  * 
  * 形式: omikuji-{timestamp}-{random}
- * 例: omikuji-20251225143052-a1b2c3d4e5f6
+ * 例: omikuji-20251225143052-a1b2c3d4-e5f6g7h8
+ * 
+ * 重要: AgentCore Runtimeは最低33文字のセッションIDを要求
  */
 export function generateNewSessionId(): string {
   const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-  const random = crypto.randomUUID().split('-')[0];
-  return `omikuji-${timestamp}-${random}`;
+  const uuid = crypto.randomUUID();
+  const randomParts = uuid.split('-').slice(0, 2).join('-'); // 8文字 + 1文字 + 4文字 = 13文字
+  // omikuji- (8) + timestamp (14) + - (1) + random (13) = 36文字
+  return `omikuji-${timestamp}-${randomParts}`;
 }
 
 /**
