@@ -329,11 +329,17 @@ FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.11-slim
 #### Step 3: AgentCore Runtime を更新
 
 ```bash
+# 現在のロールARNを確認（初回のみ）
+aws bedrock-agentcore-control get-agent-runtime \
+  --agent-runtime-id omikuji_agent-JkUdnzGA2D \
+  --query 'roleArn' --output text
+
 # 最新イメージでRuntimeを更新
 aws bedrock-agentcore-control update-agent-runtime \
   --agent-runtime-id omikuji_agent-JkUdnzGA2D \
-  --agent-runtime-artifact containerConfiguration={containerUri=<ACCOUNT_ID>.dkr.ecr.ap-northeast-1.amazonaws.com/bedrock-agentcore-my_agent:latest} \
-  --network-configuration networkMode=PUBLIC
+  --agent-runtime-artifact 'containerConfiguration={containerUri=<ACCOUNT_ID>.dkr.ecr.ap-northeast-1.amazonaws.com/bedrock-agentcore-my_agent:latest}' \
+  --network-configuration networkMode=PUBLIC \
+  --role-arn <ROLE_ARN>
 
 # 更新状況を確認
 aws bedrock-agentcore-control get-agent-runtime \
@@ -434,7 +440,31 @@ Unknown parameter 'containerUri' in agentRuntimeArtifact
 --agent-runtime-artifact containerUri=xxx
 
 # OK
---agent-runtime-artifact containerConfiguration={containerUri=xxx}
+--agent-runtime-artifact 'containerConfiguration={containerUri=xxx}'
+```
+
+#### AgentCore Runtime 更新時に role-arn エラー
+
+```
+the following arguments are required: --role-arn
+```
+
+**原因**: `update-agent-runtime` コマンドには `--role-arn` が必須
+
+**解決**: 現在のロールARNを取得して指定
+
+```bash
+# ロールARN確認
+aws bedrock-agentcore-control get-agent-runtime \
+  --agent-runtime-id omikuji_agent-JkUdnzGA2D \
+  --query 'roleArn' --output text
+
+# 更新時に --role-arn を追加
+aws bedrock-agentcore-control update-agent-runtime \
+  --agent-runtime-id omikuji_agent-JkUdnzGA2D \
+  --agent-runtime-artifact 'containerConfiguration={containerUri=xxx}' \
+  --network-configuration networkMode=PUBLIC \
+  --role-arn arn:aws:iam::<ACCOUNT_ID>:role/AmazonBedrockAgentCoreSDKRuntime-...
 ```
 
 ## 環境変数
@@ -507,6 +537,9 @@ Unknown parameter 'containerUri' in agentRuntimeArtifact
   - AgentCoreMemorySessionManager 実装
   - セッション管理の修正（36文字以上のセッションID）
   - おみくじ/チャット分離（action パラメータ）
+- [x] **CodeBuild GitHub 連携** 🚀
+  - GitHub リポジトリから直接ビルド（S3 ZIP 廃止）
+  - 再現性のあるデプロイフロー確立
 
 ### 📋 TODO
 
@@ -523,9 +556,11 @@ Unknown parameter 'containerUri' in agentRuntimeArtifact
 | **Runtime Name** | omikuji_agent |
 | **Runtime ID** | omikuji_agent-JkUdnzGA2D |
 | **Runtime ARN** | arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/omikuji_agent-JkUdnzGA2D |
+| **Role ARN** | arn:aws:iam::226484346947:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-e72c1a7c7a |
 | **Memory ID** | my_agent_mem-W3DiyUCFmg |
 | **Status** | READY |
 | **ECR Repository** | bedrock-agentcore-my_agent |
+| **CodeBuild Project** | bedrock-agentcore-my_agent-builder |
 
 ## 参考リンク
 
