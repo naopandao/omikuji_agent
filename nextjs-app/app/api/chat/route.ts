@@ -69,7 +69,8 @@ ${message}
       payload: new TextEncoder().encode(JSON.stringify({ 
         prompt,
         session_id: requestSessionId,
-        actor_id: actorId
+        actor_id: actorId,
+        action: 'chat'  // 明示的にチャットアクション
       })),
     });
 

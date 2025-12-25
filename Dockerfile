@@ -1,7 +1,8 @@
 # Bedrock AgentCore Runtime - Dockerfile
 # Python 3.11 on ARM64 for optimal performance
+# Using ECR Public to avoid Docker Hub rate limits
 
-FROM --platform=linux/arm64 python:3.11-slim
+FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.11-slim
 
 WORKDIR /app
 
@@ -19,4 +20,3 @@ ENV PYTHONUNBUFFERED=1
 
 # Run the agent (uses app.run() which starts uvicorn server)
 CMD ["python", "omikuji_agent.py"]
-

@@ -5,8 +5,8 @@ Strands Agents と AgentCore Memory を統合し、
 おみくじ結果についてチャットで会話できるようにします。
 
 セッション管理:
-- おみくじを引く → 新しい session_id を発行
-- チャットする → 同じ session_id を使用
+- おみくじを引く → 新しい session_id を発行 (action="draw")
+- チャットする → 同じ session_id を使用 (action="chat")
 - 再度おみくじ → 新しい session_id を発行（新しい会話開始）
 """
 
@@ -170,20 +170,32 @@ def invoke(payload, context=None):
         - prompt: ユーザーの入力
         - session_id: セッションID（おみくじID）
         - actor_id: ユーザー識別子（オプション）
+        - action: "draw"（おみくじを引く）または "chat"（チャット）
     """
     
     # ペイロードからパラメータ取得
     user_prompt = payload.get("prompt", "おみくじを引きたい")
     session_id = payload.get("session_id", f"default-{datetime.now().strftime('%Y%m%d%H%M%S')}")
     actor_id = payload.get("actor_id", "anonymous_user")
+    action = payload.get("action", "auto")  # "draw", "chat", または "auto"
     
-    print(f"[omikuji_agent] session_id={session_id}, actor_id={actor_id}, prompt={user_prompt[:50]}...")
+    print(f"[omikuji_agent] action={action}, session_id={session_id}, actor_id={actor_id}, prompt={user_prompt[:50]}...")
     
     # Memory統合済み Agent を作成
     agent = create_agent_with_memory(session_id, actor_id)
     
+    # アクションを判定
+    is_draw_action = False
+    if action == "draw":
+        is_draw_action = True
+    elif action == "chat":
+        is_draw_action = False
+    else:  # auto - キーワードベースで判定（後方互換性）
+        draw_keywords = ["おみくじを引", "運勢を占", "fortune", "omikuji"]
+        is_draw_action = any(kw in user_prompt.lower() for kw in draw_keywords)
+    
     # おみくじを引く処理
-    if "おみくじ" in user_prompt or "運勢" in user_prompt or "fortune" in user_prompt.lower() or "omikuji" in user_prompt.lower():
+    if is_draw_action:
         # おみくじ結果生成
         result = create_fortune_result()
         result["stars"] = "★" * result["score"] + "☆" * (5 - result["score"])
@@ -213,9 +225,8 @@ def invoke(payload, context=None):
             "session_id": session_id
         }
     
-    # その他の会話（チャット機能）
+    # チャット処理（Memoryから過去のおみくじ結果が自動的に参照される）
     else:
-        # Memoryから過去のおみくじ結果が自動的に参照される
         enhanced_prompt = f"""
 ユーザーからの質問: {user_prompt}
 

@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
       payload: new TextEncoder().encode(JSON.stringify({ 
         prompt,
         session_id: requestSessionId,
-        actor_id: actorId
+        actor_id: actorId,
+        action: 'draw'  // 明示的におみくじを引くアクション
       })),
     });
 
