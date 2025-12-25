@@ -8,6 +8,8 @@ Strands Agents と AgentCore Memory を統合し、
 - おみくじを引く → 新しい session_id を発行 (action="draw")
 - チャットする → 同じ session_id を使用 (action="chat")
 - 再度おみくじ → 新しい session_id を発行（新しい会話開始）
+
+Version: 2.0.0 (CodeBuild GitHub Integration)
 """
 
 import os
