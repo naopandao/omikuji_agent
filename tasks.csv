@@ -7,10 +7,10 @@ T005,✅ 完了,Done,npm脆弱性対応,"eslint-config-next を15.0.3にアッ�
 T006,🟡 中,P2,E2Eテスト本番実行設定,"GitHub Secrets に E2E_BASE_URL を設定し、mainマージ時に本番サイトでE2Eテスト実行",未着手,,2025-12-31,
 T007,🟡 中,P2,Amplify環境変数設定,"AGENTCORE_RUNTIME_ARN をAmplify Console で設定。現在は未設定のためフォールバック動作",未着手,,2025-12-31,
 T008,🟡 中,P2,エラーハンドリング改善,"AgentCore接続失敗時のユーザー向けメッセージ改善。フォールバック使用中の明示",未着手,,2025-12-31,
-T009,🟢 低,P3,レスポンスパーサー統一,"JSONパース処理が chat と omikuji で重複。parseAgentCoreResponse 関数に統一",未着手,,2025-12-31,
+T009,✅ 完了,Done,レスポンスパーサー統一,"T003で lib/agentcore.ts の parseAgentCoreResponse に統一完了",完了,,2025-12-31,2025-12-31
 T010,🟢 低,P3,ログ出力の統一,"console.log を統一的なロガー（pino等）に置き換え。構造化ログ対応",未着手,,2025-12-31,
 T011,🟢 低,P3,テストカバレッジ向上,"現在のカバレッジを測定し、80%以上を目標にテスト追加",未着手,,2025-12-31,
-T012,🟢 低,P3,README更新,"AgentCore Runtimeの問題点（bedrock_agentcore.serverエラー）を現状セクションに追記",未着手,,2025-12-31,
+T012,✅ 完了,Done,README更新,"AgentCore Runtimeの問題点を現状セクションに追記。ハードコードARN除去、プロジェクト構成更新",完了,,2025-12-31,2025-12-31
 T013,✅ 完了,Done,テスト環境セットアップ,Vitest + Playwright 導入,完了,,2025-12-31,2025-12-31
 T014,✅ 完了,Done,Unit/Integrationテスト作成,API Routes と lib関数のテスト作成,完了,,2025-12-31,2025-12-31
 T015,✅ 完了,Done,CI/CDワークフロー追加,GitHub Actions でテスト自動実行,完了,,2025-12-31,2025-12-31
