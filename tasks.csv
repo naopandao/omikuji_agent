@@ -3,7 +3,7 @@ T001,🔴 緊急,P0,AgentCore Runtime Dockerイメージ修正,"bedrock_agentcor
 T002,✅ 完了,Done,ハードコードARNの完全除去,"フォールバック値から本番アカウントIDを除去。環境変数必須化とフォールバック処理追加",完了,,2025-12-31,2025-12-31
 T003,🟠 高,P1,API Routes重複コード解消,"chat/route.ts と omikuji/route.ts でAgentCore呼び出しロジックが重複。共通ユーティリティに抽出",未着手,,2025-12-31,
 T004,🟠 高,P1,型安全性向上（any排除）,"eslint-disable-next-line @typescript-eslint/no-explicit-any を使用している箇所を型定義で修正",未着手,,2025-12-31,
-T005,🟠 高,P1,npm脆弱性対応,"npm audit で 3 high severity vulnerabilities が検出されている。依存関係のアップデート",未着手,,2025-12-31,
+T005,✅ 完了,Done,npm脆弱性対応,"eslint-config-next を15.0.3にアップデートし、高脆弱性を解消",完了,,2025-12-31,2025-12-31
 T006,🟡 中,P2,E2Eテスト本番実行設定,"GitHub Secrets に E2E_BASE_URL を設定し、mainマージ時に本番サイトでE2Eテスト実行",未着手,,2025-12-31,
 T007,🟡 中,P2,Amplify環境変数設定,"AGENTCORE_RUNTIME_ARN をAmplify Console で設定。現在は未設定のためフォールバック動作",未着手,,2025-12-31,
 T008,🟡 中,P2,エラーハンドリング改善,"AgentCore接続失敗時のユーザー向けメッセージ改善。フォールバック使用中の明示",未着手,,2025-12-31,
