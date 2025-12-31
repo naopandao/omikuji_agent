@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       // JSONパース試行
       try {
         const parsed = JSON.parse(responseText);
-        let result = parsed.result || parsed.text || parsed.message || responseText;
+        const result = parsed.result || parsed.text || parsed.message || responseText;
         
         if (parsed.fortune_data) {
           fortuneData = parsed.fortune_data;

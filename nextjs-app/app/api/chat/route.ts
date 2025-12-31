@@ -133,7 +133,7 @@ ${message}
       // JSONパース試行
       try {
         const parsed = JSON.parse(responseText);
-        let result = parsed.result || parsed.text || parsed.message || responseText;
+        const result = parsed.result || parsed.text || parsed.message || responseText;
         
         // result が文字列の場合、内部のJSONをさらにパース
         if (typeof result === 'string') {
