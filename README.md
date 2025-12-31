@@ -221,12 +221,17 @@ omikuji-agent/
 └── nextjs-app/                   # Amplify Hosting フロントエンド
     ├── app/
     │   ├── api/
-    │   │   ├── omikuji/route.ts  # おみくじAPI
-    │   │   └── chat/route.ts     # チャットAPI
-    │   ├── page.tsx              # メインページ
+    │   │   ├── omikuji/route.ts  # おみくじAPI（AgentCore呼び出し）
+    │   │   └── chat/route.ts     # チャットAPI（AgentCore呼び出し）
+    │   ├── page.tsx              # メインページ（おみくじUI + チャット）
     │   └── layout.tsx            # レイアウト
     ├── lib/
-    │   └── api.ts                # API クライアント（セッション管理）
+    │   ├── api.ts                # API クライアント（セッション管理）
+    │   └── agentcore.ts          # AgentCore共通ユーティリティ ⭐ New
+    ├── __tests__/                # テストコード
+    │   ├── unit/                 # ユニットテスト（Vitest）
+    │   └── integration/          # 統合テスト
+    ├── e2e/                      # E2Eテスト（Playwright）
     ├── package.json
     └── tailwind.config.ts
 ```
@@ -527,7 +532,7 @@ aws bedrock-agentcore-control update-agent-runtime \
 
 ### ✅ 完了
 
-- [x] AgentCore Runtime デプロイ（omikuji_agent-JkUdnzGA2D）
+- [x] AgentCore Runtime デプロイ
 - [x] Strands Agent 基本実装
 - [x] フロントエンド UI 完成
 - [x] Amplify Hosting デプロイ
@@ -540,27 +545,39 @@ aws bedrock-agentcore-control update-agent-runtime \
 - [x] **CodeBuild GitHub 連携** 🚀
   - GitHub リポジトリから直接ビルド（S3 ZIP 廃止）
   - 再現性のあるデプロイフロー確立
+- [x] **コード品質改善** 🛡️
+  - ハードコードARN完全除去（環境変数必須化）
+  - npm脆弱性対応（0 vulnerabilities）
+  - API Routes共通ユーティリティ化（lib/agentcore.ts）
+  - 型安全性向上（any排除）
+- [x] **テスト環境整備** 🧪
+  - Vitest + Playwright 導入
+  - Unit/Integrationテスト作成（20件）
+  - GitHub Actions CI/CD ワークフロー
 
 ### 📋 TODO
 
+- [ ] **AgentCore Runtime 問題解決** ⚠️
+  - `No module named bedrock_agentcore.server` エラー調査
+  - PyPI パッケージの正しい導入方法確認
 - [ ] Code Interpreter 統合（統計・グラフ生成）
 - [ ] Long-Term Memory (LTM) 対応
 - [ ] actor_id のユーザー個別化（現在は全ユーザー共通）
 - [ ] Cognito 認証連携
 - [ ] CloudWatch GenAI Dashboard 設定
+- [ ] E2Eテスト本番実行設定
 
 ## AgentCore Runtime 情報
 
-| 項目 | 値 |
-|------|-----|
-| **Runtime Name** | omikuji_agent |
-| **Runtime ID** | omikuji_agent-JkUdnzGA2D |
-| **Runtime ARN** | arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/omikuji_agent-JkUdnzGA2D |
-| **Role ARN** | arn:aws:iam::226484346947:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-e72c1a7c7a |
-| **Memory ID** | my_agent_mem-W3DiyUCFmg |
-| **Status** | READY |
-| **ECR Repository** | bedrock-agentcore-my_agent |
-| **CodeBuild Project** | bedrock-agentcore-my_agent-builder |
+| 項目 | 値 | 説明 |
+|------|-----|------|
+| **Runtime Name** | omikuji_agent | 固定 |
+| **Runtime ID** | `${RUNTIME_ID}` | 環境変数 `AGENTCORE_RUNTIME_ARN` から取得 |
+| **Memory ID** | `${MEMORY_ID}` | 環境変数 `BEDROCK_AGENTCORE_MEMORY_ID` から設定 |
+| **ECR Repository** | bedrock-agentcore-my_agent | 固定 |
+| **CodeBuild Project** | bedrock-agentcore-my_agent-builder | 固定 |
+
+> ⚠️ **セキュリティ**: 本番のARN、アカウントID、ロールARNはコードにハードコードせず、環境変数で管理してください。
 
 ## 参考リンク
 
