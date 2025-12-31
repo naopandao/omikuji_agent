@@ -27,6 +27,8 @@ export interface OmikujiResponse {
   result: string;
   fortune_data: FortuneData;
   sessionId: string;
+  _fallback?: boolean;  // フォールバックモードかどうか
+  _reason?: string;     // フォールバックの理由
 }
 
 export interface ChatMessage {
@@ -126,13 +128,20 @@ export async function fetchOmikuji(): Promise<OmikujiResponse> {
       result: data.result || '',
       fortune_data: data.fortune_data || getFallbackFortuneData(),
       sessionId: effectiveSessionId,
+      _fallback: data._fallback || false,
+      _reason: data._reason,
     };
 
   } catch (error) {
     console.error('Failed to fetch omikuji:', error);
     // フォールバック: モックデータを返す
     saveSessionId(newSessionId);
-    return getFallbackOmikuji(newSessionId);
+    const fallback = getFallbackOmikuji(newSessionId);
+    return {
+      ...fallback,
+      _fallback: true,
+      _reason: error instanceof Error ? error.message : 'Connection error',
+    };
   }
 }
 
