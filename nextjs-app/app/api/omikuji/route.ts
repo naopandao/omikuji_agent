@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// AgentCore Runtime 設定
-// 重要: AGENTCORE_RUNTIME_ARN は環境変数で設定してください
-// Amplify Console > Environment Variables で設定
-const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN;
-const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
+import {
+  AGENTCORE_RUNTIME_ARN,
+  AWS_REGION,
+  isAgentCoreConfigured,
+  convertResponseToText,
+  parseAgentCoreResponse,
+  normalizeFortuneData,
+  getFallbackFortuneMessage,
+  getFallbackFortuneData,
+  FortuneData,
+} from '@/lib/agentcore';
 
 // 環境変数未設定の警告（開発時のみログ出力）
-if (!AGENTCORE_RUNTIME_ARN && process.env.NODE_ENV === 'development') {
+if (!isAgentCoreConfigured() && process.env.NODE_ENV === 'development') {
   console.warn('[Omikuji API] AGENTCORE_RUNTIME_ARN is not set. Using fallback mode.');
 }
 
@@ -26,10 +31,10 @@ export async function POST(request: NextRequest) {
     requestSessionId = sessionId || requestSessionId;
 
     // 環境変数が設定されていない場合はフォールバックを返す
-    if (!AGENTCORE_RUNTIME_ARN) {
+    if (!isAgentCoreConfigured()) {
       console.log('[Omikuji API] AGENTCORE_RUNTIME_ARN not configured, returning fallback');
       return NextResponse.json({
-        result: getFallbackMessage(),
+        result: getFallbackFortuneMessage(),
         fortune_data: getFallbackFortuneData(),
         sessionId: requestSessionId,
         _fallback: true,
@@ -67,94 +72,18 @@ export async function POST(request: NextRequest) {
     const response = await client.send(command);
 
     // AgentCore Runtime のレスポンスを読み取り
-    // response.response は StreamingBlobPayloadOutputTypes（Blob/Buffer/ReadableStream）
     let aiMessage = '';
-    let fortuneData = null;
+    let fortuneData: FortuneData | null = null;
     
     if (response.response) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const responseBody = response.response as any;
+      const responseText = await convertResponseToText(response.response);
+      const { message, parsed } = parseAgentCoreResponse(responseText);
+      aiMessage = message;
       
-      // レスポンスをテキストに変換
-      let responseText = '';
-      
-      if (typeof responseBody === 'string') {
-        responseText = responseBody;
-      } else if (responseBody instanceof Uint8Array || Buffer.isBuffer(responseBody)) {
-        responseText = new TextDecoder().decode(responseBody);
-      } else if (typeof responseBody.transformToString === 'function') {
-        // AWS SDK SdkStream type
-        responseText = await responseBody.transformToString();
-      } else if (typeof responseBody.text === 'function') {
-        // Blob type
-        responseText = await responseBody.text();
-      } else if (responseBody[Symbol.asyncIterator]) {
-        // Async iterable (ReadableStream)
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of responseBody) {
-          chunks.push(chunk as Uint8Array);
-        }
-        const combined = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
-        let offset = 0;
-        for (const chunk of chunks) {
-          combined.set(chunk, offset);
-          offset += chunk.length;
-        }
-        responseText = new TextDecoder().decode(combined);
+      // fortune_data を抽出
+      if (parsed?.fortune_data) {
+        fortuneData = normalizeFortuneData(parsed.fortune_data as Record<string, unknown>);
       }
-      
-      // JSONパース試行
-      try {
-        const parsed = JSON.parse(responseText);
-        const result = parsed.result || parsed.text || parsed.message || responseText;
-        
-        if (parsed.fortune_data) {
-          fortuneData = parsed.fortune_data;
-        }
-        
-        // result が文字列の場合、内部のJSONをさらにパース
-        if (typeof result === 'string') {
-          try {
-            // {'role': 'assistant', 'content': [{'text': '...'}]} 形式を処理
-            const jsonStr = result.replace(/'/g, '"');
-            const innerParsed = JSON.parse(jsonStr);
-            
-            if (innerParsed.content && Array.isArray(innerParsed.content)) {
-              const textContent = innerParsed.content
-                .filter((c: { text?: string }) => c.text)
-                .map((c: { text: string }) => c.text)
-                .join('\n');
-              if (textContent) {
-                aiMessage = textContent;
-              } else {
-                aiMessage = result;
-              }
-            } else if (innerParsed.text) {
-              aiMessage = innerParsed.text;
-            } else {
-              aiMessage = result;
-            }
-          } catch {
-            aiMessage = result;
-          }
-        } else {
-          aiMessage = responseText;
-        }
-      } catch {
-        aiMessage = responseText;
-      }
-    }
-
-    // fortune_data のキー名を正規化（snake_case → camelCase）
-    if (fortuneData) {
-      fortuneData = {
-        fortune: fortuneData.fortune,
-        stars: fortuneData.stars,
-        luckyColor: fortuneData.lucky_color || fortuneData.luckyColor,
-        luckyItem: fortuneData.lucky_item || fortuneData.luckyItem,
-        luckySpot: fortuneData.lucky_spot || fortuneData.luckySpot,
-        timestamp: fortuneData.timestamp || new Date().toISOString(),
-      };
     }
 
     console.log('[Omikuji API] Response:', { aiMessage: aiMessage.substring(0, 100), fortuneData });
@@ -171,44 +100,11 @@ export async function POST(request: NextRequest) {
     
     // フォールバック: モックデータを返す
     return NextResponse.json({
-      result: getFallbackMessage(),
+      result: getFallbackFortuneMessage(),
       fortune_data: getFallbackFortuneData(),
       sessionId: requestSessionId,
       _fallback: true,
       _error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-}
-
-// フォールバック用関数
-function getFallbackMessage(): string {
-  const FORTUNES = ['大吉', '中吉', '小吉', '吉', '末吉', '凶'];
-  const fortune = FORTUNES[Math.floor(Math.random() * FORTUNES.length)];
-  
-  const messages: Record<string, string> = {
-    '大吉': '✨ やばい！めっちゃ最高の運勢じゃん！今日は何やってもうまくいくから、思い切ってチャレンジしちゃお！💕',
-    '中吉': '💖 いい感じ～！ちょっと頑張れば素敵なことが起こりそう！推し活も捗るかも！',
-    '小吉': '🌸 まあまあいい感じ！小さな幸せを見つけられる日だよ！',
-    '吉': '🍀 普通にいい日！コツコツ頑張ってれば良いことあるよ！',
-    '末吉': '🌿 ゆっくりだけど運気上昇中！焦らずいこ！',
-    '凶': '☁️ 今日はおとなしくしてた方がいいかも...でも明日はきっといい日になるよ！',
-  };
-
-  return messages[fortune] || 'おみくじの結果です！';
-}
-
-function getFallbackFortuneData() {
-  const FORTUNES = ['大吉', '中吉', '小吉', '吉', '末吉', '凶'];
-  const COLORS = ['ピンク', '水色', 'ラベンダー', 'ミントグリーン', 'コーラル', 'ゴールド'];
-  const ITEMS = ['リップグロス', 'ミラー', 'お気に入りのアクセ', 'ハンドクリーム', '推しのグッズ'];
-  const SPOTS = ['カフェ', 'ショッピングモール', '公園', '神社', '映画館'];
-
-  return {
-    fortune: FORTUNES[Math.floor(Math.random() * FORTUNES.length)],
-    stars: '★'.repeat(Math.floor(Math.random() * 3) + 3) + '☆'.repeat(2),
-    luckyColor: COLORS[Math.floor(Math.random() * COLORS.length)],
-    luckyItem: ITEMS[Math.floor(Math.random() * ITEMS.length)],
-    luckySpot: SPOTS[Math.floor(Math.random() * SPOTS.length)],
-    timestamp: new Date().toISOString(),
-  };
 }

@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// AgentCore Runtime 設定
-// 重要: AGENTCORE_RUNTIME_ARN は環境変数で設定してください
-// Amplify Console > Environment Variables で設定
-const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN;
-const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
+import {
+  AGENTCORE_RUNTIME_ARN,
+  AWS_REGION,
+  isAgentCoreConfigured,
+  convertResponseToText,
+  parseAgentCoreResponse,
+  getFallbackChatMessage,
+  FortuneData,
+} from '@/lib/agentcore';
 
 // 環境変数未設定の警告（開発時のみログ出力）
-if (!AGENTCORE_RUNTIME_ARN && process.env.NODE_ENV === 'development') {
+if (!isAgentCoreConfigured() && process.env.NODE_ENV === 'development') {
   console.warn('[Chat API] AGENTCORE_RUNTIME_ARN is not set. Using fallback mode.');
 }
 
@@ -24,7 +27,12 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { message, sessionId, actorId = 'web_user', fortuneContext } = body;
+    const { message, sessionId, actorId = 'web_user', fortuneContext } = body as {
+      message?: string;
+      sessionId?: string;
+      actorId?: string;
+      fortuneContext?: FortuneData;
+    };
     
     if (!message) {
       return NextResponse.json(
@@ -36,7 +44,7 @@ export async function POST(request: NextRequest) {
     requestSessionId = sessionId || requestSessionId;
 
     // 環境変数が設定されていない場合はフォールバックを返す
-    if (!AGENTCORE_RUNTIME_ARN) {
+    if (!isAgentCoreConfigured()) {
       console.log('[Chat API] AGENTCORE_RUNTIME_ARN not configured, returning fallback');
       return NextResponse.json({
         message: 'ごめんね、AIエージェントがまだ設定されてないみたい💦 管理者に連絡してね！',
@@ -95,85 +103,16 @@ ${message}
     const response = await client.send(command);
 
     // AgentCore Runtime のレスポンスを読み取り
-    // response.response は StreamingBlobPayloadOutputTypes（Blob/Buffer/ReadableStream）
     let aiMessage = '';
     if (response.response) {
-      // Node.js環境: response.response は Readable Streamの可能性
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const responseBody = response.response as any;
-      
-      // レスポンスをテキストに変換
-      let responseText = '';
-      
-      if (typeof responseBody === 'string') {
-        responseText = responseBody;
-      } else if (responseBody instanceof Uint8Array || Buffer.isBuffer(responseBody)) {
-        responseText = new TextDecoder().decode(responseBody);
-      } else if (typeof responseBody.transformToString === 'function') {
-        // AWS SDK SdkStream type
-        responseText = await responseBody.transformToString();
-      } else if (typeof responseBody.text === 'function') {
-        // Blob type
-        responseText = await responseBody.text();
-      } else if (responseBody[Symbol.asyncIterator]) {
-        // Async iterable (ReadableStream)
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of responseBody) {
-          chunks.push(chunk as Uint8Array);
-        }
-        const combined = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
-        let offset = 0;
-        for (const chunk of chunks) {
-          combined.set(chunk, offset);
-          offset += chunk.length;
-        }
-        responseText = new TextDecoder().decode(combined);
-      }
-      
-      // JSONパース試行
-      try {
-        const parsed = JSON.parse(responseText);
-        const result = parsed.result || parsed.text || parsed.message || responseText;
-        
-        // result が文字列の場合、内部のJSONをさらにパース
-        if (typeof result === 'string') {
-          try {
-            // {'role': 'assistant', 'content': [{'text': '...'}]} 形式を処理
-            // Python の repr 形式を JSON に変換
-            const jsonStr = result.replace(/'/g, '"');
-            const innerParsed = JSON.parse(jsonStr);
-            
-            if (innerParsed.content && Array.isArray(innerParsed.content)) {
-              // content 配列から text を抽出
-              const textContent = innerParsed.content
-                .filter((c: { text?: string }) => c.text)
-                .map((c: { text: string }) => c.text)
-                .join('\n');
-              if (textContent) {
-                aiMessage = textContent;
-              } else {
-                aiMessage = result;
-              }
-            } else if (innerParsed.text) {
-              aiMessage = innerParsed.text;
-            } else {
-              aiMessage = result;
-            }
-          } catch {
-            // 内部パースに失敗した場合はそのまま使用
-            aiMessage = result;
-          }
-        } else {
-          aiMessage = responseText;
-        }
-      } catch {
-        aiMessage = responseText;
-      }
+      const responseText = await convertResponseToText(response.response);
+      const { message: parsedMessage } = parseAgentCoreResponse(responseText);
+      aiMessage = parsedMessage;
     }
 
     // レスポンスが空の場合のフォールバック
     if (!aiMessage || aiMessage.trim() === '') {
-      aiMessage = 'ごめんね、ちょっと上手く答えられなかった💦 もう一回聞いてみて！';
+      aiMessage = getFallbackChatMessage();
     }
 
     console.log('[Chat API] Response:', { aiMessage: aiMessage.substring(0, 100) });
