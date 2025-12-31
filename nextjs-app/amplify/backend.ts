@@ -19,9 +19,14 @@ const backend = defineBackend({
 });
 
 // AgentCore Runtime ARN（環境変数から取得）
-const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN || 
-  'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/my_agent-9NBXM54pmz';
+// 重要: AGENTCORE_RUNTIME_ARN は Amplify Console > Environment Variables で設定
+const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN || '';
 const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
+
+// ビルド時の警告
+if (!AGENTCORE_RUNTIME_ARN) {
+  console.warn('[Amplify Backend] AGENTCORE_RUNTIME_ARN is not set. AgentCore integration will not work.');
+}
 
 // AgentCore Runtime 呼び出し権限をAppSync Data Roleに追加
 const dataStack = backend.data.stack;
