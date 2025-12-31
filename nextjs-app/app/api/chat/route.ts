@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // AgentCore Runtime 設定
-const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN || 
-  'arn:aws:bedrock-agentcore:ap-northeast-1:226484346947:runtime/omikuji_agent-JkUdnzGA2D';
+// 重要: AGENTCORE_RUNTIME_ARN は環境変数で設定してください
+// Amplify Console > Environment Variables で設定
+const AGENTCORE_RUNTIME_ARN = process.env.AGENTCORE_RUNTIME_ARN;
 const AWS_REGION = process.env.AWS_REGION || 'ap-northeast-1';
+
+// 環境変数未設定の警告（開発時のみログ出力）
+if (!AGENTCORE_RUNTIME_ARN && process.env.NODE_ENV === 'development') {
+  console.warn('[Chat API] AGENTCORE_RUNTIME_ARN is not set. Using fallback mode.');
+}
 
 /**
  * チャットAPI - AgentCore Runtime を呼び出し
@@ -28,6 +34,18 @@ export async function POST(request: NextRequest) {
     }
 
     requestSessionId = sessionId || requestSessionId;
+
+    // 環境変数が設定されていない場合はフォールバックを返す
+    if (!AGENTCORE_RUNTIME_ARN) {
+      console.log('[Chat API] AGENTCORE_RUNTIME_ARN not configured, returning fallback');
+      return NextResponse.json({
+        message: 'ごめんね、AIエージェントがまだ設定されてないみたい💦 管理者に連絡してね！',
+        sessionId: requestSessionId,
+        timestamp: new Date().toISOString(),
+        _fallback: true,
+        _reason: 'AGENTCORE_RUNTIME_ARN not configured',
+      });
+    }
 
     // 動的importでAWS SDKを読み込み（SSR互換性のため）
     const { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } = await import('@aws-sdk/client-bedrock-agentcore');

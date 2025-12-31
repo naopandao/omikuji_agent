@@ -57,3 +57,4 @@ amplify/mock-api-resources
 pids/
 *.pid
 *.pid.lock
+test-results/
