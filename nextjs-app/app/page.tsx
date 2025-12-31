@@ -32,6 +32,9 @@ export default function Home() {
   
   // 現在のセッションID（おみくじを引くと新しいIDが発行される）
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  
+  // フォールバックモード表示用
+  const [isFallbackMode, setIsFallbackMode] = useState(false);
 
   /**
    * おみくじを引く
@@ -49,11 +52,14 @@ export default function Home() {
       setFortune(result.fortune_data);
       setAiMessage(result.result);
       setCurrentSessionId(result.sessionId);
+      
+      // フォールバックモード判定
+      setIsFallbackMode(!!result._fallback);
 
       // ローカル履歴に保存
       await saveFortuneResult(result.fortune_data);
       
-      console.log('[Page] New omikuji session:', result.sessionId);
+      console.log('[Page] New omikuji session:', result.sessionId, 'fallback:', result._fallback);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'おみくじの取得に失敗しました'
@@ -149,6 +155,19 @@ export default function Home() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-8">
             {error}
+          </div>
+        )}
+
+        {/* フォールバックモード通知 */}
+        {isFallbackMode && fortune && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-8">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⚠️</span>
+              <div>
+                <p className="font-semibold">デモモードで動作中</p>
+                <p className="text-sm">AIエージェントに接続できないため、ローカルのランダム結果を表示しています。チャット機能は制限されます。</p>
+              </div>
+            </div>
           </div>
         )}
 
