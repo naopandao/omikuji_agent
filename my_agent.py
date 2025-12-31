@@ -5,7 +5,7 @@ AI おみくじエージェント - Step 1: 基礎版（公式準拠）
 
 import random
 from datetime import datetime
-from bedrock_agentcore import BedrockAgentCoreApp
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands import Agent
 
 # AgentCore アプリケーション初期化
