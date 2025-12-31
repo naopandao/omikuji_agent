@@ -3,6 +3,28 @@
 ## 問題
 `omikuji_agent.py` を修正したが、AgentCore Runtime に反映されていないため、チャット機能が正しく動作しない。
 
+## 🔧 重要な修正事項（2025-12-31）
+
+### インポートパスの修正
+
+AWS公式ドキュメントに基づき、インポートパスを修正：
+
+```python
+# ❌ 旧（エラー: No module named bedrock_agentcore.server）
+from bedrock_agentcore import BedrockAgentCoreApp
+
+# ✅ 新（正しいパス）
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
+```
+
+### requirements.txt のバージョン
+
+```
+bedrock-agentcore[strands-agents]>=1.1.2
+```
+
+**参照:** https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-long-run.html
+
 ## 解決方法
 
 ### オプション1: AWS Console から更新（推奨）

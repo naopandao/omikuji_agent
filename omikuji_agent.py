@@ -16,7 +16,7 @@ import os
 import json
 import random
 from datetime import datetime
-from bedrock_agentcore import BedrockAgentCoreApp
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands import Agent
 
 # Strands + AgentCore Memory 統合
