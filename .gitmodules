@@ -1,0 +1,8 @@
+[submodule ".cursor"]
+	path = .cursor
+	url = git@github.com:aezisai-inc/aria-cursor-rules.git
+	branch = develop
+[submodule ".well-known"]
+	path = .well-known
+	url = git@github.com:aezisai-inc/aria-well-known.git
+	branch = develop
